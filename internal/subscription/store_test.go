@@ -86,7 +86,6 @@ func TestConcurrentPutGet(t *testing.T) {
 	s := NewStore(0)
 	var wg sync.WaitGroup
 	for i := range 64 {
-		i := i
 		wg.Go(func() {
 			s.Put(Subscription{GroupID: "g", MemberID: "m" + itoa(i), Topics: []string{"t"}})
 		})

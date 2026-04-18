@@ -30,13 +30,13 @@ func TestSyncGroupRequestRoundTrip(t *testing.T) {
 			},
 		},
 		{
-			Version:      5, // flex + protocol fields
-			Group:        "g",
-			Generation:   9,
-			MemberID:     "leader",
-			InstancePres: true,
-			InstanceID:   "",
-			InstanceNull: true,
+			Version:       5, // flex + protocol fields
+			Group:         "g",
+			Generation:    9,
+			MemberID:      "leader",
+			InstancePres:  true,
+			InstanceID:    "",
+			InstanceNull:  true,
 			ProtoTypePres: true,
 			ProtocolType:  "consumer",
 			ProtoNamePres: true,

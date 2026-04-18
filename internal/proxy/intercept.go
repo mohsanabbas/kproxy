@@ -1,6 +1,10 @@
 package proxy
 
-import "github.com/mohsanabbas/kproxy/internal/kwire"
+import (
+	"context"
+
+	"github.com/mohsanabbas/kproxy/internal/kwire"
+)
 
 // Interceptor decides, for each request frame travelling client→broker, whether
 // the proxy should register a Pending entry that will let it inspect or rewrite
@@ -14,15 +18,16 @@ import "github.com/mohsanabbas/kproxy/internal/kwire"
 // compose around this.
 type Interceptor interface {
 	// OnRequest is called after the request header has been decoded but before
-	// the frame is forwarded upstream. body is the request payload (after the
-	// header). The interceptor may inspect body but MUST NOT retain it past
-	// the call (the underlying buffer is reused).
+	// the frame is forwarded upstream. ctx is the per-connection context; it
+	// is cancelled when the connection shuts down. body is the request payload
+	// (after the header). The interceptor may inspect body but MUST NOT
+	// retain it past the call (the underlying buffer is reused).
 	//
-	// Returning a non-nil *Pending registers it; returning nil means
+	// Returning a non-nil *Pending registers it returning nil means
 	// passthrough. Returning a Pending whose Rewrite is nil is allowed — the
 	// proxy will still let the response flow through but will deliver it to
 	// the interceptor's OnResponse hook for telemetry.
-	OnRequest(h kwire.RequestHeader, body []byte) *Pending
+	OnRequest(ctx context.Context, h kwire.RequestHeader, body []byte) *Pending
 }
 
 // NoopInterceptor forwards every frame untouched. Useful as the bottom of an
@@ -30,4 +35,4 @@ type Interceptor interface {
 type NoopInterceptor struct{}
 
 // OnRequest implements Interceptor.
-func (NoopInterceptor) OnRequest(kwire.RequestHeader, []byte) *Pending { return nil }
+func (NoopInterceptor) OnRequest(context.Context, kwire.RequestHeader, []byte) *Pending { return nil }

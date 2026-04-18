@@ -40,8 +40,8 @@ type Cache struct {
 
 	// single-flight: at most one refresh runs at any time. Concurrent callers
 	// of Refresh wait on the in-flight one.
-	mu      sync.Mutex
-	flight  *refreshCall
+	mu     sync.Mutex
+	flight *refreshCall
 }
 
 // Source supplies fresh metadata. In production this is implemented by a

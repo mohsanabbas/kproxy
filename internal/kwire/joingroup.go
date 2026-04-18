@@ -8,19 +8,19 @@ package kwire
 //	v6:    flexible
 //	v9:    + Reason             (after Protocols, NULLABLE_STRING)
 type JoinGroupRequest struct {
-	Version             int16
-	Group               string
-	SessionTimeoutMs    int32
-	RebalanceTimeoutMs  int32 // v1+; -1 sentinel pre-v1
-	MemberID            string
-	GroupInstanceID     string // v5+
-	GIIDPresent         bool
-	GIIDNull            bool
-	ProtocolType        string
-	Protocols           []JoinGroupProtocol
-	Reason              string // v9+
-	ReasonPresent       bool
-	ReasonNull          bool
+	Version            int16
+	Group              string
+	SessionTimeoutMs   int32
+	RebalanceTimeoutMs int32 // v1+; -1 sentinel pre-v1
+	MemberID           string
+	GroupInstanceID    string // v5+
+	GIIDPresent        bool
+	GIIDNull           bool
+	ProtocolType       string
+	Protocols          []JoinGroupProtocol
+	Reason             string // v9+
+	ReasonPresent      bool
+	ReasonNull         bool
 }
 
 // JoinGroupProtocol is one entry in JoinGroupRequest.Protocols. The Metadata

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -14,7 +15,7 @@ import (
 // test can assert the broker received it.
 type rewritingInterceptor struct{ replacement []byte }
 
-func (r rewritingInterceptor) OnRequest(h kwire.RequestHeader, body []byte) *Pending {
+func (r rewritingInterceptor) OnRequest(_ context.Context, h kwire.RequestHeader, body []byte) *Pending {
 	return &Pending{RewriteRequest: r.replacement}
 }
 

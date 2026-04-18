@@ -7,7 +7,6 @@ import (
 	"net"
 )
 
-
 // Writer writes length-prefixed Kafka frames to a stream. When the underlying
 // writer is a *net.TCPConn we use net.Buffers (writev) to send the 4-byte
 // length and the body in a single syscall — zero allocations per frame.

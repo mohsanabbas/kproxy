@@ -19,18 +19,20 @@ import (
 )
 
 // FrameCounter is the minimal sink the proxy uses to publish per-direction
-// frame counts. obs.Metrics satisfies this; tests can pass a no-op or a stub.
-// Kept as an interface (rather than importing obs) so the proxy package stays
-// dependency-free.
+// frame counts and tracker-drop events. obs.Metrics satisfies this; tests can
+// pass a no-op or a stub. Kept as an interface (rather than importing obs) so
+// the proxy package stays dependency-free.
 type FrameCounter interface {
 	IncClientToBroker()
 	IncBrokerToClient()
+	IncTrackerDropped()
 }
 
 type noopFrameCounter struct{}
 
 func (noopFrameCounter) IncClientToBroker() {}
 func (noopFrameCounter) IncBrokerToClient() {}
+func (noopFrameCounter) IncTrackerDropped() {}
 
 // Config tunes a single Conn.
 type Config struct {
@@ -63,6 +65,10 @@ type Conn struct {
 	clientW *frame.Writer
 	brokerR *frame.Reader
 	brokerW *frame.Writer
+
+	// ctx is the per-connection context, cancelled when the conn shuts down.
+	// Stored so the upstream pump can pass it to the Interceptor.
+	ctx context.Context
 
 	// closeOnce ensures Close is idempotent even when both pumps trip it.
 	closeOnce sync.Once
@@ -99,6 +105,7 @@ func New(cfg Config, client, broker net.Conn, ic Interceptor) *Conn {
 // blocks the calling goroutine; the typical caller is the per-conn goroutine
 // in the listener.
 func (c *Conn) Run(ctx context.Context) error {
+	c.ctx = ctx
 	// Cancellation: when ctx fires, we close both sockets. The pump goroutines
 	// then exit on their next read/write with a "use of closed conn" error,
 	// which we map to nil if it was caused by us.
@@ -139,7 +146,9 @@ func (c *Conn) upstreamPump() error {
 
 	for {
 		if d := c.cfg.IdleTimeout; d > 0 {
-			_ = c.client.SetReadDeadline(time.Now().Add(d))
+			if err := c.client.SetReadDeadline(time.Now().Add(d)); err != nil {
+				return fmt.Errorf("client SetReadDeadline: %w", err)
+			}
 		}
 		body, err := c.clientR.ReadFrame(buf)
 		if err != nil {
@@ -155,7 +164,7 @@ func (c *Conn) upstreamPump() error {
 			return fmt.Errorf("decode req header (len=%d, hex=%x): %w", len(body), body, err)
 		}
 		out := body
-		if p := c.interceptor.OnRequest(h, body[h.HeaderSize:]); p != nil {
+		if p := c.interceptor.OnRequest(c.ctx, h, body[h.HeaderSize:]); p != nil {
 			p.APIKey = h.APIKey
 			p.APIVersion = h.APIVersion
 			p.CorrelID = h.CorrelID
@@ -167,10 +176,9 @@ func (c *Conn) upstreamPump() error {
 				reqRewriteBuf = append(reqRewriteBuf, p.RewriteRequest...)
 				out = reqRewriteBuf
 			}
-			// Best-effort registration. If the tracker is full or there's an
-			// id collision, we proceed as plain passthrough — better to leak
-			// the rewrite than to drop a real request.
-			_ = c.tracker.Register(p)
+			if !c.tracker.Register(p) {
+				c.cfg.Frames.IncTrackerDropped()
+			}
 		}
 		if err := c.brokerW.WriteFrame(out); err != nil {
 			return err
@@ -186,6 +194,7 @@ func (c *Conn) upstreamPump() error {
 //   - rewriteBuf is given to the Rewrite callback as its append target.
 //   - outBuf is used to assemble the outgoing frame (response header +
 //     rewritten payload).
+//
 // They MUST NOT share backing storage, because the rewriter's returned slice
 // is read while we write the response header into outBuf.
 func (c *Conn) downstreamPump() error {
@@ -196,7 +205,9 @@ func (c *Conn) downstreamPump() error {
 
 	for {
 		if d := c.cfg.IdleTimeout; d > 0 {
-			_ = c.broker.SetReadDeadline(time.Now().Add(d))
+			if err := c.broker.SetReadDeadline(time.Now().Add(d)); err != nil {
+				return fmt.Errorf("broker SetReadDeadline: %w", err)
+			}
 		}
 		body, err := c.brokerR.ReadFrame(buf)
 		if err != nil {

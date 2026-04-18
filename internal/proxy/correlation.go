@@ -34,11 +34,6 @@ type Pending struct {
 	// leader's Assignments[] with the planner's assignments before the broker
 	// fans them out to followers.
 	RewriteRequest []byte
-
-	// Ctx carries any per-request state that downstream needs (e.g. the
-	// JoinGroup leader's member id). The interceptor populates it on the
-	// upstream side.
-	Ctx any
 }
 
 // RewriteFunc transforms a response body. dst is a scratch slice the rewriter

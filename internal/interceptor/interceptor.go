@@ -38,6 +38,11 @@ type Deps struct {
 // for v1: a single struct dispatches by API key.
 type Interceptor struct {
 	deps Deps
+
+	// syncGroupRewrites counts how many SyncGroup requests were rewritten.
+	// Exposed via SyncGroupRewrites() for test assertions production code
+	// observes via deps.Metrics.PlanCount.
+	syncGroupRewrites atomic.Int64
 }
 
 // New returns a ready-to-use Interceptor.
@@ -48,18 +53,10 @@ func New(d Deps) *Interceptor {
 	return &Interceptor{deps: d}
 }
 
-// joinCtx carries data captured during JoinGroup request decode that the
-// SyncGroup intercept needs (member id assignment etc.). Stored on Pending.Ctx
-// for now; we read it when the leader's SyncGroupRequest arrives.
-type joinCtx struct {
-	groupID  string
-	memberID string
-}
-
 // OnRequest implements proxy.Interceptor. It dispatches by API key and
 // returns a Pending whose Rewrite (if non-nil) will be invoked on the
 // downstream pump for the matching response.
-func (i *Interceptor) OnRequest(h kwire.RequestHeader, body []byte) *proxy.Pending {
+func (i *Interceptor) OnRequest(ctx context.Context, h kwire.RequestHeader, body []byte) *proxy.Pending {
 	if i.deps.Metrics != nil {
 		i.deps.Metrics.InterceptsTotal.Add(1)
 	}
@@ -71,7 +68,7 @@ func (i *Interceptor) OnRequest(h kwire.RequestHeader, body []byte) *proxy.Pendi
 	case kwire.APIJoinGroup:
 		return i.onJoinGroup(h, body)
 	case kwire.APISyncGroup:
-		return i.onSyncGroup(h, body)
+		return i.onSyncGroup(ctx, h, body)
 	}
 	if i.deps.Metrics != nil {
 		i.deps.Metrics.InterceptsPassthru.Add(1)
@@ -185,7 +182,7 @@ func (i *Interceptor) onJoinGroup(h kwire.RequestHeader, body []byte) *proxy.Pen
 // member sending non-empty Assignments). We compute a fresh plan and rewrite
 // the request.Assignments before forwarding to the broker, so that members
 // receive our planned assignment in their SyncGroupResponse.
-func (i *Interceptor) onSyncGroup(h kwire.RequestHeader, body []byte) *proxy.Pending {
+func (i *Interceptor) onSyncGroup(ctx context.Context, h kwire.RequestHeader, body []byte) *proxy.Pending {
 	if i.deps.Planner == nil || i.deps.Subscription == nil {
 		if i.deps.Metrics != nil {
 			i.deps.Metrics.InterceptsPassthru.Add(1)
@@ -258,7 +255,7 @@ func (i *Interceptor) onSyncGroup(h kwire.RequestHeader, body []byte) *proxy.Pen
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), i.deps.PlanTimeout)
+	ctx, cancel := context.WithTimeout(ctx, i.deps.PlanTimeout)
 	pl, dur, err := i.deps.Planner.Plan(ctx, plan.Inputs{
 		GroupID:    sg.Group,
 		Members:    members,
@@ -292,22 +289,18 @@ func (i *Interceptor) onSyncGroup(h kwire.RequestHeader, body []byte) *proxy.Pen
 	}
 	rewrittenReq := kwire.AppendSyncGroupRequest(nil, newSG)
 
-	atomicCount.Add(1)
+	i.syncGroupRewrites.Add(1)
 	return &proxy.Pending{
 		APIKey:         h.APIKey,
 		APIVersion:     h.APIVersion,
-		Ctx:            joinCtx{groupID: sg.Group, memberID: sg.MemberID},
 		RewriteRequest: rewrittenReq,
 	}
 }
 
-// atomicCount is a counter used by tests to assert that the SyncGroup branch
-// actually fired.
-var atomicCount atomic.Int64
-
-// SyncGroupRewrites returns the number of SyncGroup responses we've
-// rewritten since process start. Test helper; metrics expose the same data.
-func SyncGroupRewrites() int64 { return atomicCount.Load() }
+// SyncGroupRewrites returns the number of SyncGroup requests rewritten by
+// this Interceptor. Useful for test assertions; production code observes via
+// Metrics.PlanCount.
+func (i *Interceptor) SyncGroupRewrites() int64 { return i.syncGroupRewrites.Load() }
 
 func (i *Interceptor) bumpErr() {
 	if i.deps.Metrics != nil {

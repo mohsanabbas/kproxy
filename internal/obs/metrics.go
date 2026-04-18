@@ -26,13 +26,14 @@ type Metrics struct {
 	InterceptsTimeout    atomic.Int64
 	InterceptsError      atomic.Int64
 	UnmappedBrokers      atomic.Int64
+	TrackerDropped       atomic.Int64
 	PlanDurationNanosSum atomic.Int64
 	PlanCount            atomic.Int64
 
 	// Gauges
-	ConnActive       atomic.Int64
-	TelemetryAgeNS   atomic.Int64
-	SubscriptionLen  atomic.Int64
+	ConnActive      atomic.Int64
+	TelemetryAgeNS  atomic.Int64
+	SubscriptionLen atomic.Int64
 }
 
 // IncClientToBroker satisfies proxy.FrameCounter.
@@ -40,6 +41,9 @@ func (m *Metrics) IncClientToBroker() { m.FramesClientToBroker.Add(1) }
 
 // IncBrokerToClient satisfies proxy.FrameCounter.
 func (m *Metrics) IncBrokerToClient() { m.FramesBrokerToClient.Add(1) }
+
+// IncTrackerDropped satisfies proxy.FrameCounter.
+func (m *Metrics) IncTrackerDropped() { m.TrackerDropped.Add(1) }
 
 // New returns a fresh Metrics registered under the given expvar root name. If
 // publish is false (tests), expvar isn't touched.
@@ -56,6 +60,7 @@ func New(name string, publish bool) *Metrics {
 				"intercepts_timeout":        m.InterceptsTimeout.Load(),
 				"intercepts_error":          m.InterceptsError.Load(),
 				"unmapped_brokers":          m.UnmappedBrokers.Load(),
+				"tracker_dropped":           m.TrackerDropped.Load(),
 				"plan_duration_nanos_total": m.PlanDurationNanosSum.Load(),
 				"plan_count":                m.PlanCount.Load(),
 				"conn_active":               m.ConnActive.Load(),
@@ -79,6 +84,7 @@ func (m *Metrics) PromText() []byte {
 	b = appendCounter(b, "kproxy_intercepts_total", "outcome", "timeout", m.InterceptsTimeout.Load())
 	b = appendCounter(b, "kproxy_intercepts_total", "outcome", "error", m.InterceptsError.Load())
 	b = appendSimple(b, "kproxy_unmapped_brokers_total", m.UnmappedBrokers.Load())
+	b = appendSimple(b, "kproxy_tracker_dropped_total", m.TrackerDropped.Load())
 	b = appendSimple(b, "kproxy_plan_count_total", m.PlanCount.Load())
 	planNS := m.PlanDurationNanosSum.Load()
 	b = appendFloat(b, "kproxy_plan_duration_seconds_sum", float64(planNS)/1e9)

@@ -135,7 +135,7 @@ type recordingInterceptor struct {
 	wantAPIKeys map[int16]bool
 }
 
-func (r *recordingInterceptor) OnRequest(h kwire.RequestHeader, _ []byte) *Pending {
+func (r *recordingInterceptor) OnRequest(_ context.Context, h kwire.RequestHeader, _ []byte) *Pending {
 	r.calls.Add(1)
 	r.mu.Lock()
 	defer r.mu.Unlock()

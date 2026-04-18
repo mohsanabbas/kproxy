@@ -10,20 +10,20 @@ package kwire
 //
 // Fields not present in the encoded version are left zero / nil.
 type SyncGroupRequest struct {
-	Version      int16
-	Group        string
-	Generation   int32
-	MemberID     string
-	InstanceID   string // v3+
-	InstancePres bool   // tracks present-vs-null at protocol level
-	InstanceNull bool
-	ProtocolType string // v5+
+	Version       int16
+	Group         string
+	Generation    int32
+	MemberID      string
+	InstanceID    string // v3+
+	InstancePres  bool   // tracks present-vs-null at protocol level
+	InstanceNull  bool
+	ProtocolType  string // v5+
 	ProtoTypePres bool
 	ProtoTypeNull bool
-	ProtocolName string // v5+
+	ProtocolName  string // v5+
 	ProtoNamePres bool
 	ProtoNameNull bool
-	Assignments  []SyncGroupAssignment
+	Assignments   []SyncGroupAssignment
 }
 
 // SyncGroupAssignment is one entry in SyncGroupRequest.Assignments.

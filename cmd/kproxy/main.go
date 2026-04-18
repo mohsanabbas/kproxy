@@ -21,6 +21,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/mohsanabbas/kproxy/internal/interceptor"
 	"github.com/mohsanabbas/kproxy/internal/kclient"
 	"github.com/mohsanabbas/kproxy/internal/metadata"
@@ -94,7 +96,7 @@ func run() error {
 		"listen", cfg.listen, "broker", cfg.broker, "bootstrap", cfg.bootstrap,
 		"admin", cfg.admin, "go", runtime.Version())
 
-	// --- Topology -----------------------------------------------------------
+	// Topology
 	topo := topology.New()
 	switch {
 	case cfg.topologyFlag != "":
@@ -112,25 +114,25 @@ func run() error {
 	}
 	logger.Info("topology loaded", "entries", topo.Len())
 
-	// --- Observability ------------------------------------------------------
+	// Observability
 	metrics := obs.New("kproxy", true)
 
-	// --- Side-channel kclient (shared by metadata + telemetry) -------------
+	// Side-channel kclient (shared by metadata + telemetry) -
 	side, err := kclient.Dial(cfg.bootstrap, cfg.clientID, cfg.dialTimeout)
 	if err != nil {
 		return fmt.Errorf("dial bootstrap: %w", err)
 	}
 	defer side.Close()
 
-	// --- Metadata cache -----------------------------------------------------
+	// Metadata cache
 	metaCache := metadata.NewCache(metadata.KClientSource{Conn: side}, cfg.refresh)
 
-	// --- Subscription store + telemetry registry --------------------------
+	// Subscription store + telemetry registry
 	subStore := subscription.NewStore(cfg.subMax)
 	groupReg := telemetry.NewSyncRegistry()
 	subStore.SetOnChange(func(group string) { groupReg.Add(group) })
 
-	// --- Telemetry holder + poller -----------------------------------------
+	// Telemetry holder + poller
 	holder := &telemetry.Holder{}
 	poller := &telemetry.Poller{
 		Coord:    side,
@@ -142,10 +144,10 @@ func run() error {
 		},
 	}
 
-	// --- Planner pool ------------------------------------------------------
+	// Planner pool
 	pp := planner.New(cfg.plannerWorker, cfg.plannerQueue)
 
-	// --- Interceptor wiring ------------------------------------------------
+	// Interceptor wiring
 	ic := interceptor.New(interceptor.Deps{
 		Topology:     topo,
 		Metadata:     metaCache,
@@ -156,7 +158,7 @@ func run() error {
 		Metrics:      metrics,
 	})
 
-	// --- Listener ----------------------------------------------------------
+	// Listener
 	ln, err := net.Listen("tcp", cfg.listen)
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
@@ -190,44 +192,43 @@ func run() error {
 		},
 	}
 
-	// --- Run everything ----------------------------------------------------
+	// Run everything
 	rootCtx, rootCancel := context.WithCancel(context.Background())
 	defer rootCancel()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	errCh := make(chan error, 4)
-	serveDone := make(chan struct{})
-	go func() { metaCache.Run(rootCtx); errCh <- nil }()
-	go func() { poller.Run(rootCtx); errCh <- nil }()
-	go func() {
+	eg, egCtx := errgroup.WithContext(rootCtx)
+
+	eg.Go(func() error { metaCache.Run(egCtx); return nil })
+	eg.Go(func() error { poller.Run(egCtx); return nil })
+	eg.Go(func() error {
 		if cfg.admin == "" {
-			errCh <- nil
-			return
+			return nil
 		}
 		admin := &obs.Admin{Addr: cfg.admin, Metrics: metrics}
-		errCh <- admin.Run(rootCtx)
-	}()
-	go func() {
-		err := listener.Serve(rootCtx)
+		return admin.Run(egCtx)
+	})
+
+	serveDone := make(chan struct{})
+	eg.Go(func() error {
+		err := listener.Serve(egCtx)
 		close(serveDone)
-		errCh <- err
-	}()
+		return err
+	})
 
 	// telemetry-age + subscription-len gauges, refreshed at the same cadence
 	// as telemetry polling.
-	go gaugeRefresher(rootCtx, metrics, holder, subStore)
+	eg.Go(func() error { gaugeRefresher(egCtx, metrics, holder, subStore); return nil })
 
 	logger.Info("kproxy ready", "addr", ln.Addr().String())
 
 	select {
 	case sig := <-sigCh:
 		logger.Info("signal received", "sig", sig.String())
-	case err := <-errCh:
-		if err != nil {
-			logger.Error("subsystem failed", "err", err)
-		}
+	case <-egCtx.Done():
+		logger.Error("subsystem failed")
 	}
 
 	// Orderly shutdown: close listener so accept loop unblocks; wait up to
@@ -244,6 +245,8 @@ func run() error {
 	dcancel()
 	rootCancel()
 	pp.Close()
+	// Wait for all goroutines to finish after cancellation.
+	_ = eg.Wait()
 	logger.Info("kproxy stopped")
 	return nil
 }
@@ -267,4 +270,3 @@ func gaugeRefresher(ctx context.Context, m *obs.Metrics, h *telemetry.Holder, s 
 		}
 	}
 }
-

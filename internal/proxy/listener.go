@@ -87,9 +87,7 @@ func (l *Listener) Serve(ctx context.Context) error {
 			}
 			continue
 		}
-		wg.Add(1)
-		go func(c, b net.Conn) {
-			defer wg.Done()
+		wg.Go(func() {
 			defer func() {
 				if sem != nil {
 					<-sem
@@ -103,11 +101,11 @@ func (l *Listener) Serve(ctx context.Context) error {
 					l.OnConnEnd()
 				}
 			}()
-			conn := l.MakeConn(c, b)
+			conn := l.MakeConn(client, broker)
 			if err := conn.Run(ctx); err != nil && l.OnAcceptError != nil {
 				l.OnAcceptError(err)
 			}
-		}(client, broker)
+		})
 	}
 }
 

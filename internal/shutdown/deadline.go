@@ -20,6 +20,7 @@ type Group struct {
 	mu      sync.Mutex
 	closed  bool
 	members map[*member]struct{}
+	empty   chan struct{} // signalled when membership drops to zero
 }
 
 type member struct {
@@ -35,6 +36,7 @@ func (g *Group) Add(cancel context.CancelFunc, conn net.Conn) (release func()) {
 	g.mu.Lock()
 	if g.members == nil {
 		g.members = make(map[*member]struct{})
+		g.empty = make(chan struct{}, 1)
 	}
 	if g.closed {
 		g.mu.Unlock()
@@ -47,6 +49,12 @@ func (g *Group) Add(cancel context.CancelFunc, conn net.Conn) (release func()) {
 	return func() {
 		g.mu.Lock()
 		delete(g.members, m)
+		if len(g.members) == 0 {
+			select {
+			case g.empty <- struct{}{}:
+			default:
+			}
+		}
 		g.mu.Unlock()
 	}
 }
@@ -63,33 +71,27 @@ func (g *Group) Drain(ctx context.Context) {
 	for m := range g.members {
 		m.cancel()
 	}
+	if g.empty == nil {
+		g.empty = make(chan struct{}, 1)
+	}
+	n := len(g.members)
+	emptyCh := g.empty
 	g.mu.Unlock()
 
-	// Polling — cheap because the membership is small (bounded by conn cap).
-	for {
+	if n == 0 {
+		return
+	}
+
+	select {
+	case <-emptyCh:
+	case <-ctx.Done():
 		g.mu.Lock()
-		n := len(g.members)
-		g.mu.Unlock()
-		if n == 0 {
-			return
-		}
-		select {
-		case <-ctx.Done():
-			g.mu.Lock()
-			for m := range g.members {
-				if m.conn != nil {
-					_ = m.conn.Close()
-				}
+		for m := range g.members {
+			if m.conn != nil {
+				_ = m.conn.Close()
 			}
-			g.mu.Unlock()
-			return
-		default:
 		}
-		// Yield without burning CPU.
-		select {
-		case <-ctx.Done():
-		case <-pollAfter():
-		}
+		g.mu.Unlock()
 	}
 }
 

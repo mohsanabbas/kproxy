@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -307,30 +308,8 @@ type kErr struct {
 	code int16
 }
 
-func (e *kErr) Error() string { return e.op + ": kafka error code " + itoa(int64(e.code)) }
-
-// itoa avoids an strconv import for a tiny formatting helper. Allocates a
-// short string per error path; not on the hot tick path beyond error reports.
-func itoa(n int64) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		i--
-		buf[i] = '-'
-	}
-	return string(buf[i:])
+func (e *kErr) Error() string {
+	return e.op + ": kafka error code " + strconv.FormatInt(int64(e.code), 10)
 }
 
 // Compile-time guard: a Holder satisfies Source.
