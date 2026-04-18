@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"context"
 	"io"
 	"net"
 	"sync/atomic"
@@ -27,8 +26,7 @@ func BenchmarkPassthrough(b *testing.B) {
 	defer brokerApp.Close()
 
 	conn := New(Config{}, clientSide, brokerSide, NoopInterceptor{})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := b.Context()
 	go func() { _ = conn.Run(ctx) }()
 
 	// Pre-build the request frame once.

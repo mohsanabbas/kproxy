@@ -79,10 +79,7 @@ func NewTracker(maxSize int, maxAge time.Duration) *Tracker {
 	// Sweep at least once every maxAge/4, capped at 1s to avoid spinning on
 	// long-lived deployments. With the default 5-min maxAge we sweep every
 	// second; with a 10ms test value we sweep every ~2.5ms.
-	sweep := maxAge / 4
-	if sweep > time.Second {
-		sweep = time.Second
-	}
+	sweep := min(maxAge/4, time.Second)
 	if sweep <= 0 {
 		sweep = time.Microsecond
 	}

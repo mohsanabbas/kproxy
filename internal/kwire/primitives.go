@@ -186,7 +186,7 @@ func (c *Cursor) ReadNullableBytes() (b []byte, isNull bool, err error) {
 func (c *Cursor) ReadUvarint() (uint32, error) {
 	var v uint32
 	var shift uint
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if c.off >= len(c.buf) {
 			return 0, ErrTruncated
 		}
@@ -309,7 +309,7 @@ func (c *Cursor) SkipTaggedFields() error {
 	if err != nil {
 		return err
 	}
-	for i := uint32(0); i < n; i++ {
+	for range n {
 		if _, err := c.ReadUvarint(); err != nil { // tag id
 			return err
 		}

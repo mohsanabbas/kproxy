@@ -1,6 +1,6 @@
-# `sync` Primitives — When Channels Aren't the Answer
+# `sync` Primitives When Channels Aren't the Answer
 
-Pike's mantra is "share memory by communicating" — but he also said, in the same talk:
+Pike's mantra is "share memory by communicating" but he also said, in the same talk:
 **"Don't overdo it. Sometimes all you need is a reference counter."** This file covers the
 cases where mutexes, atomics, and other `sync` primitives are the right tool.
 
@@ -11,10 +11,10 @@ cases where mutexes, atomics, and other `sync` primitives are the right tool.
 3. [`sync.Once` and `sync.OnceValue`/`OnceValues`](#3-synconce-and-synconcevalueoncevalues)
 4. [`sync.WaitGroup` and `WaitGroup.Go` (1.25+)](#4-syncwaitgroup-and-waitgroupgo-125)
 5. [`sync.Pool`](#5-syncpool)
-6. [`sync.Map` — the narrow use case](#6-syncmap--the-narrow-use-case)
-7. [`sync.Cond` — rarely the answer](#7-synccond--rarely-the-answer)
-8. [`atomic` — for counters and flags](#8-atomic--for-counters-and-flags)
-9. [`errgroup.Group` — structured concurrency](#9-errgroupgroup--structured-concurrency)
+6. [`sync.Map` the narrow use case](#6-syncmap--the-narrow-use-case)
+7. [`sync.Cond` rarely the answer](#7-synccond--rarely-the-answer)
+8. [`atomic` for counters and flags](#8-atomic--for-counters-and-flags)
+9. [`errgroup.Group` structured concurrency](#9-errgroupgroup--structured-concurrency)
 
 ---
 
@@ -60,7 +60,7 @@ func (c *Counter) Value() int {
 
 - **Zero value is usable.** `sync.Mutex{}` is an unlocked mutex. No `NewMutex()`.
 - **Pointer receivers only** on methods of types containing a `Mutex`. Value receivers copy
-  the mutex silently — `go vet` catches this, run it.
+  the mutex silently `go vet` catches this, run it.
 - **`defer mu.Unlock()`** on the next line after `mu.Lock()`. Without defer, any return path
   or panic leaves the mutex locked forever.
 - **Minimize the critical section.** Lock, do the minimum, unlock. Don't make network calls
@@ -84,7 +84,7 @@ func (c *Cache) Set(k string, v Value) {
 ```
 
 Use `RWMutex` when reads dominate writes (10:1 or more). With more balanced workloads, plain
-`Mutex` is usually faster — `RWMutex` has overhead for tracking readers.
+`Mutex` is usually faster `RWMutex` has overhead for tracking readers.
 
 **Pitfalls:**
 
@@ -93,7 +93,7 @@ Use `RWMutex` when reads dominate writes (10:1 or more). With more balanced work
   typically a public `Bar()` that locks + a private `bar()` that doesn't and assumes the lock
   is held.
 - **Lock ordering deadlock.** If goroutine G1 holds lock A and waits for B, while G2 holds B
-  and waits for A — deadlock. Convention: always acquire locks in the same order throughout
+  and waits for A deadlock. Convention: always acquire locks in the same order throughout
   the program. Document the order.
 
 ## 3. `sync.Once` and `sync.OnceValue`/`OnceValues`
@@ -135,8 +135,8 @@ error).
 - Idempotent shutdown: `once.Do(close)` makes double-close safe.
 
 **When NOT to use `Once`:**
-- Init at startup — just do it in `main` before spawning goroutines.
-- When the computed value might change — `Once` is forever.
+- Init at startup just do it in `main` before spawning goroutines.
+- When the computed value might change `Once` is forever.
 
 ## 4. `sync.WaitGroup` and `WaitGroup.Go` (1.25+)
 
@@ -157,7 +157,7 @@ wg.Wait()
 **Rules:**
 - **`Add` in the spawning goroutine**, before `go`. Never inside the goroutine itself.
 - **`Done` in the goroutine**, typically via `defer`.
-- **`Wait` in a third goroutine** (or the caller) — not in one of the workers.
+- **`Wait` in a third goroutine** (or the caller) not in one of the workers.
 - **No errors.** `WaitGroup` doesn't collect errors. For that, use `errgroup` (section 9).
 
 **Go 1.25+ `wg.Go(fn)`:** single method that handles `Add`/`Done` correctly:
@@ -170,7 +170,7 @@ for _, task := range tasks {
 wg.Wait()
 ```
 
-Use `wg.Go` by default — it eliminates the most common `WaitGroup` bug (calling `Add` inside
+Use `wg.Go` by default it eliminates the most common `WaitGroup` bug (calling `Add` inside
 the goroutine).
 
 ## 5. `sync.Pool`
@@ -199,7 +199,7 @@ func handle(req *Request) {
 - **`sync.Pool` is cleared on every GC cycle.** It's a short-term reuse mechanism, not a
   durable cache.
 - **Only pool objects with expensive allocation.** For a 16-byte struct, pooling is slower
-  than allocating — the pool's own bookkeeping costs more.
+  than allocating the pool's own bookkeeping costs more.
 - **Put must release references.** Putting a `*bytes.Buffer` with a 1 GB underlying array
   back in the pool pins that memory. Truncate or reset to a small size before Put.
 
@@ -210,7 +210,7 @@ any allocation that shows up in pprof as a hot spot.
 expensive to construct AND cheap to hold in a long-lived cache. `sync.Pool` is for the
 "expensive to allocate, cheap to discard" quadrant.
 
-## 6. `sync.Map` — the narrow use case
+## 6. `sync.Map` the narrow use case
 
 `sync.Map` is **not a replacement for `map[K]V` + mutex.** Benchmarks consistently show the
 mutex-guarded map is faster for most workloads.
@@ -235,12 +235,12 @@ sm.Store(key, value)
 v, ok := sm.Load(key)
 ```
 
-## 7. `sync.Cond` — rarely the answer
+## 7. `sync.Cond` rarely the answer
 
 Condition variables. If you find yourself reaching for this, ask first: would a channel be
 clearer?
 
-Legitimate uses are narrow — coordinating many goroutines waiting for the same condition to
+Legitimate uses are narrow coordinating many goroutines waiting for the same condition to
 become true, where broadcast is more efficient than per-waiter channels. Even then, many Go
 engineers have shipped entire careers without using `sync.Cond`.
 
@@ -254,11 +254,11 @@ for !ready { cond.Wait() }  // mu released inside Wait, reacquired before return
 mu.Unlock()
 ```
 
-## 8. `atomic` — for counters and flags
+## 8. `atomic` for counters and flags
 
-`sync/atomic` provides atomic operations — lock-free concurrent access to single values.
+`sync/atomic` provides atomic operations lock-free concurrent access to single values.
 
-**Since Go 1.19, use the typed atomic wrappers** — `atomic.Int64`, `atomic.Bool`, `atomic.Pointer[T]`.
+**Since Go 1.19, use the typed atomic wrappers** `atomic.Int64`, `atomic.Bool`, `atomic.Pointer[T]`.
 They're safer than the loose functions:
 
 ```go
@@ -281,7 +281,7 @@ cur := config.Load()
 - Cases where mutex overhead is measurable.
 
 **When it's wrong:**
-- Protecting multiple related fields — use a mutex to keep them consistent.
+- Protecting multiple related fields use a mutex to keep them consistent.
 - Anything requiring compare-and-set of a compound state (struct with several fields).
 
 **The CAS (compare-and-swap) loop:**
@@ -297,9 +297,9 @@ for {
 }
 ```
 
-Use sparingly. Most code doesn't need CAS — it needs a mutex.
+Use sparingly. Most code doesn't need CAS it needs a mutex.
 
-## 9. `errgroup.Group` — structured concurrency
+## 9. `errgroup.Group` structured concurrency
 
 Not in `sync`, but paired conceptually. From `golang.org/x/sync/errgroup`:
 

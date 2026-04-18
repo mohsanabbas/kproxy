@@ -87,7 +87,7 @@ func DecodeListOffsetsResponse(body []byte) (ListOffsetsResponse, error) {
 	}
 	if n > 0 {
 		r.Topics = make([]ListOffsetsTopicResp, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			t := ListOffsetsTopicResp{}
 			t.Name, err = c.ReadCompactString()
 			if err != nil {
@@ -99,7 +99,7 @@ func DecodeListOffsetsResponse(body []byte) (ListOffsetsResponse, error) {
 			}
 			if pn > 0 {
 				t.Partitions = make([]ListOffsetsPartitionResp, pn)
-				for j := 0; j < pn; j++ {
+				for j := range pn {
 					p := ListOffsetsPartitionResp{}
 					if p.PartitionIndex, err = c.ReadInt32(); err != nil {
 						return r, err

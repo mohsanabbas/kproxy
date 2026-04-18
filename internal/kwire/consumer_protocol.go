@@ -58,7 +58,7 @@ func DecodeSubscription(blob []byte) (Subscription, error) {
 	}
 	if n > 0 {
 		s.Topics = make([]string, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			t, err := c.ReadString()
 			if err != nil {
 				return s, err
@@ -195,7 +195,7 @@ func decodeTopicPartitions(c *Cursor) ([]TopicPartitions, error) {
 		return nil, nil
 	}
 	out := make([]TopicPartitions, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		topic, err := c.ReadString()
 		if err != nil {
 			return nil, err
@@ -207,7 +207,7 @@ func decodeTopicPartitions(c *Cursor) ([]TopicPartitions, error) {
 		var parts []int32
 		if pn > 0 {
 			parts = make([]int32, pn)
-			for j := 0; j < pn; j++ {
+			for j := range pn {
 				p, err := c.ReadInt32()
 				if err != nil {
 					return nil, err

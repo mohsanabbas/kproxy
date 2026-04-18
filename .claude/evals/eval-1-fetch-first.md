@@ -1,4 +1,4 @@
-# FetchFirst — Concurrent URL Fetcher
+# FetchFirst Concurrent URL Fetcher
 
 This is a first-responder pattern: N parallel fetches, return the first success, cancel the rest.
 
@@ -22,7 +22,7 @@ import (
 var ErrAllFailed = errors.New("fetch: all URLs failed")
 
 // defaultClient is a shared, timeout-bounded http.Client.
-// Never use http.DefaultClient — it has no timeouts and can hang forever.
+// Never use http.DefaultClient it has no timeouts and can hang forever.
 var defaultClient = &http.Client{
 	Timeout: 30 * time.Second,
 	Transport: &http.Transport{
@@ -51,11 +51,11 @@ func FetchFirst(ctx context.Context, urls []string) ([]byte, error) {
 
 	// Derived context so we can cancel siblings the moment we have a winner.
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel() // ALWAYS — cancels any still-running goroutines on return
+	defer cancel() // ALWAYS cancels any still-running goroutines on return
 
 	// Buffer sized to len(urls) so that a late goroutine (arriving after we
 	// already picked a winner) can still deposit its result and exit cleanly.
-	// With an unbuffered channel, late senders would block forever — a leak.
+	// With an unbuffered channel, late senders would block forever a leak.
 	type result struct {
 		body []byte
 		url  string
@@ -100,7 +100,7 @@ func FetchFirst(ctx context.Context, urls []string) ([]byte, error) {
 }
 
 // fetchOne performs a single GET, returning the body on 2xx or an error.
-// The request respects ctx for cancellation (critical — without this the
+// The request respects ctx for cancellation (critical without this the
 // http.Client's internal timeout is the only escape).
 func fetchOne(ctx context.Context, url string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -136,16 +136,16 @@ func fetchOne(ctx context.Context, url string) ([]byte, error) {
 ## Design notes (what this gets right)
 
 **Pattern choice.** This is *Pattern 11: First-responder* from the concurrency patterns reference.
-Not `errgroup` — we don't want "first error cancels all"; we want "first **success** cancels all".
+Not `errgroup` we don't want "first error cancels all"; we want "first **success** cancels all".
 The semantics are inverted, so hand-rolled `chan` + `select` is the right fit.
 
 **Critical: buffered result channels.** Both `wins` and `errs` are sized to `len(urls)`. If they
-were unbuffered, here's the leak: we pick a winner, cancel ctx, return — but one goroutine is
+were unbuffered, here's the leak: we pick a winner, cancel ctx, return but one goroutine is
 mid-flight and its HTTP call just finished. It calls `wins <- result{...}`, nobody's reading,
 and it blocks forever. The ctx.Done() case in the `select` is the belt; the buffer is the
 suspenders. With both, late goroutines always make progress and exit.
 
-**`defer cancel()` on the next line.** Not doing this is `govet`'s `lostcancel` warning — a
+**`defer cancel()` on the next line.** Not doing this is `govet`'s `lostcancel` warning a
 classic bug. This cancel propagates to every in-flight `http.Client.Do` call via the request
 context, which aborts the underlying TCP connection.
 
@@ -262,7 +262,7 @@ For leak-free verification, wrap the test in `testing/synctest` (Go 1.25+) or us
 ## What I'd push back on if this were a code review
 
 If the caller has a specific notion of "success" richer than 2xx (e.g. must contain a valid
-JSON payload), I'd lift that up. As written, the first 2xx wins — even if it's an empty body.
+JSON payload), I'd lift that up. As written, the first 2xx wins even if it's an empty body.
 In many production scenarios you want to validate the body before declaring a winner.
 
 Also, if the URLs target the *same* logical resource (classic first-responder: hit three

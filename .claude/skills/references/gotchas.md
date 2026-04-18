@@ -1,4 +1,4 @@
-# Go Gotchas — The Complete Survival Guide
+# Go Gotchas The Complete Survival Guide
 
 Gotchas curated from Matt Holiday's go-class "Gotchas" slides, the 50-Shades-of-Go compilation,
 and years of production Go bug tickets. Each entry: symptom → cause → fix. Scan these before
@@ -22,7 +22,7 @@ shipping anything non-trivial.
 ### 1. Goroutine leak via unreceived send
 
 ```go
-// BAD — if the caller never reads from ch, this goroutine lives forever.
+// BAD if the caller never reads from ch, this goroutine lives forever.
 go func() { ch <- expensiveValue }()
 ```
 
@@ -40,7 +40,7 @@ case <-ctx.Done():
 ### 2. Loop variable capture (pre-Go 1.22)
 
 ```go
-// BAD in go.mod < 1.22 — all goroutines see the final value of i.
+// BAD in go.mod < 1.22 all goroutines see the final value of i.
 for i, v := range items {
     go func() {
         process(i, v)  // captures loop vars by reference
@@ -61,13 +61,13 @@ for i, v := range items {
 }
 ```
 
-**Go 1.22+:** the loop variable is per-iteration by default. This bug is fixed — but verify
+**Go 1.22+:** the loop variable is per-iteration by default. This bug is fixed but verify
 your `go.mod` says `go 1.22` or later. Older libraries may still have it.
 
 ### 3. `WaitGroup.Add` inside the spawned goroutine
 
 ```go
-// BAD — Wait() can race past Add() if Wait runs before the goroutine starts
+// BAD Wait() can race past Add() if Wait runs before the goroutine starts
 var wg sync.WaitGroup
 for _, t := range tasks {
     go func() {
@@ -92,7 +92,7 @@ wg.Wait()
 ### 4. `sync.Mutex` copied by value
 
 ```go
-// BAD — passing s by value copies the mutex; the two mutexes don't protect each other.
+// BAD passing s by value copies the mutex; the two mutexes don't protect each other.
 type Counter struct { mu sync.Mutex; n int }
 func (c Counter) Inc() { c.mu.Lock(); c.n++; c.mu.Unlock() }  // wrong receiver
 ```
@@ -106,7 +106,7 @@ func (c *Counter) Inc() { c.mu.Lock(); c.n++; c.mu.Unlock() }
 ### 5. Forgetting `cancel()` on `context.With*`
 
 ```go
-// BAD — ctx leaks resources (timer, goroutine in WithTimeout) until parent is canceled.
+// BAD ctx leaks resources (timer, goroutine in WithTimeout) until parent is canceled.
 ctx, _ := context.WithTimeout(parent, time.Second)
 do(ctx)
 ```
@@ -124,7 +124,7 @@ do(ctx)
 ### 6. `time.After` leak in a long-running loop
 
 ```go
-// BAD — each iteration allocates a new timer that doesn't fire until d elapses.
+// BAD each iteration allocates a new timer that doesn't fire until d elapses.
 for {
     select {
     case v := <-ch:
@@ -158,7 +158,7 @@ version.
 ### 7. Unbuffered channel → deadlock
 
 ```go
-// BAD — no receiver, sender blocks forever.
+// BAD no receiver, sender blocks forever.
 ch := make(chan int)
 ch <- 1   // deadlock
 ```
@@ -173,7 +173,7 @@ ch <- 1   // fits in buffer
 ### 8. `select { default: }` busy-loop
 
 ```go
-// BAD — this busy-loops if no case is ready, burning CPU.
+// BAD this busy-loops if no case is ready, burning CPU.
 for {
     select {
     case v := <-ch:
@@ -203,7 +203,7 @@ closeFunc := func() { once.Do(func() { close(ch) }) }
 ### 10. Closing a channel someone else writes to
 
 ```go
-// BAD — receiver can't know when senders are done.
+// BAD receiver can't know when senders are done.
 close(ch) // in consumer
 ```
 
@@ -212,7 +212,7 @@ close(ch) // in consumer
 ### 11. `http.DefaultClient` with no timeout
 
 ```go
-resp, err := http.Get(url)   // uses http.DefaultClient — no timeout!
+resp, err := http.Get(url)   // uses http.DefaultClient no timeout!
 ```
 
 **Fix:** always construct your own client:
@@ -231,7 +231,7 @@ var client = &http.Client{
 ### 12. Shared slice/map write race
 
 ```go
-// BAD — concurrent map writes panic in Go's runtime.
+// BAD concurrent map writes panic in Go's runtime.
 m := map[string]int{}
 for _, k := range keys { go func(k string) { m[k]++ }(k) }
 ```
@@ -242,19 +242,19 @@ read-mostly with disjoint keys per goroutine). For counter-heavy workloads, `ato
 ### 13. Data race via slice header copy
 
 ```go
-// BAD — both goroutines see the same backing array.
+// BAD both goroutines see the same backing array.
 s := make([]int, 100)
 go func() { s[0] = 1 }()
 go func() { s[0] = 2 }()
 ```
 
-Passing `s` to two goroutines doesn't "copy" it — slice headers share the backing array. Use a
+Passing `s` to two goroutines doesn't "copy" it slice headers share the backing array. Use a
 mutex, or partition the work so each goroutine writes disjoint indices.
 
 ### 14. `sync.Pool.Get()` without reset
 
 ```go
-// BAD — reusing a stale object contaminates the next caller.
+// BAD reusing a stale object contaminates the next caller.
 buf := bufPool.Get().(*bytes.Buffer)
 buf.Write(...)  // still has contents from the last user!
 ```
@@ -286,7 +286,7 @@ in `concurrency-patterns.md`). If unintentional, it's a bug.
 ### 16. `for range ch` doesn't exit if ch is never closed
 
 ```go
-// Hangs forever — sender never closes.
+// Hangs forever sender never closes.
 for v := range ch {
     process(v)
 }
@@ -299,7 +299,7 @@ for v := range ch {
 ```go
 ch := make(chan int, 1000)
 for i := 0; i < 500; i++ { ch <- i }
-// never read — seems fine in tests, blows up in prod with more inputs
+// never read seems fine in tests, blows up in prod with more inputs
 ```
 
 A large buffer can hide that no one is reading. Default to unbuffered in tests; deadlocks then
@@ -309,7 +309,7 @@ surface immediately.
 
 ## Slice and map gotchas
 
-### 18. `append` aliasing — modifying a slice mutates its source
+### 18. `append` aliasing modifying a slice mutates its source
 
 ```go
 a := []int{1, 2, 3, 4, 5}
@@ -392,7 +392,7 @@ func foo() error {
 if foo() != nil { ... }  // this is true! p is nil but the interface is not.
 ```
 
-The `error` interface value has type `*MyError` and data `nil` — the interface itself is
+The `error` interface value has type `*MyError` and data `nil` the interface itself is
 non-nil because it has a type. **Fix:** return `nil` explicitly:
 
 ```go
@@ -403,7 +403,7 @@ func foo() error {
 }
 ```
 
-### 24. Interface satisfaction is structural — no "implements" keyword
+### 24. Interface satisfaction is structural no "implements" keyword
 
 A type satisfies an interface if it has the right methods. Compile-time assertion:
 
@@ -417,7 +417,7 @@ satisfied.
 ### 25. Defining interfaces at the producer, not the consumer
 
 ```go
-// BAD — producer defines an interface clients might not need.
+// BAD producer defines an interface clients might not need.
 package userdb
 type UserReader interface { Read(id int) User }
 ```
@@ -439,7 +439,7 @@ This is the Go idiom: "Accept interfaces, return structs."
 ### 26. String-comparing errors
 
 ```go
-// BAD — fragile; any error string change breaks this.
+// BAD fragile; any error string change breaks this.
 if err.Error() == "record not found" { ... }
 ```
 
@@ -460,7 +460,7 @@ if errors.Is(err, ErrNotFound) { ... }
 return fmt.Errorf("load user: %v", err)   // stringifies, loses type
 ```
 
-**Fix:** use `%w` to wrap — preserves the error chain for `errors.Is`/`errors.As`:
+**Fix:** use `%w` to wrap preserves the error chain for `errors.Is`/`errors.As`:
 
 ```go
 return fmt.Errorf("load user: %w", err)
@@ -482,7 +482,7 @@ _ = writer.Close()
 ### 29. Panic across goroutine boundaries
 
 ```go
-go work()  // if work() panics, the process dies — another goroutine can't recover it
+go work()  // if work() panics, the process dies another goroutine can't recover it
 ```
 
 **Fix:** if you're running untrusted or fallible work in a goroutine, add a recovery wrapper:
@@ -523,7 +523,7 @@ defer func() { fmt.Println("i =", i) }()
 ```go
 for _, f := range files {
     fp, _ := os.Open(f)
-    defer fp.Close()   // BAD — all closes happen at function return, after processing all files
+    defer fp.Close()   // BAD all closes happen at function return, after processing all files
     process(fp)
 }
 ```
@@ -569,7 +569,7 @@ protocol fields, always use explicit-width types (`int32`, `int64`, `uint64`).
 ```go
 s := "résumé"
 fmt.Println(s[0])   // 114 ('r'), fine
-fmt.Println(s[1])   // 195, first byte of 'é' — not a rune
+fmt.Println(s[1])   // 195, first byte of 'é' not a rune
 ```
 
 **Fix:** convert to `[]rune` for Unicode indexing, or iterate with `range` which yields
@@ -591,7 +591,7 @@ utf8.RuneCountInString(...)  // 6 runes
 `go 1.22` or later enables per-iteration loop variables. If your `go.mod` is `go 1.21`, you
 still have the old behavior even on a 1.26 toolchain. Keep this up to date.
 
-### 38. Vendoring vs modules — pick one
+### 38. Vendoring vs modules pick one
 
 Don't mix vendor directory and module mode without understanding the precedence. `GOFLAGS=-mod=vendor`
 forces vendor mode; `-mod=mod` forces module mode.
@@ -604,7 +604,7 @@ define public vs. implementation-detail APIs. No third-party tool required.
 ### 40. `_test.go` files are excluded from builds
 
 Production code can't import test helpers. If you need test utilities across packages, put
-them in a `testutil/` package (no `_test.go` suffix) — but keep it in an internal location so
+them in a `testutil/` package (no `_test.go` suffix) but keep it in an internal location so
 it isn't shipped.
 
 ---

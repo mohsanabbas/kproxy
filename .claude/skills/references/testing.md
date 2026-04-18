@@ -1,4 +1,4 @@
-# Testing Go — Tactics for Coding Agents
+# Testing Go Tactics for Coding Agents
 
 Go has the best-integrated testing story of any mainstream language: `go test`, the race
 detector, benchmarks, fuzzing, and (since 1.25) deterministic concurrency tests all ship with
@@ -6,22 +6,22 @@ the toolchain. This file covers every testing decision an agent faces.
 
 ## Table of contents
 
-1. [Table-driven tests — the default](#1-table-driven-tests--the-default)
+1. [Table-driven tests the default](#1-table-driven-tests--the-default)
 2. [Subtests and parallel execution](#2-subtests-and-parallel-execution)
 3. [Test naming conventions](#3-test-naming-conventions)
-4. [Error assertions — what to compare and how](#4-error-assertions--what-to-compare-and-how)
-5. [`testing/synctest` — deterministic concurrency tests](#5-testingsynctest--deterministic-concurrency-tests)
-6. [Race detector — always on](#6-race-detector--always-on)
+4. [Error assertions what to compare and how](#4-error-assertions--what-to-compare-and-how)
+5. [`testing/synctest` deterministic concurrency tests](#5-testingsynctest--deterministic-concurrency-tests)
+6. [Race detector always on](#6-race-detector--always-on)
 7. [Mocks, fakes, and stubs](#7-mocks-fakes-and-stubs)
 8. [Fuzz testing](#8-fuzz-testing)
 9. [Benchmarks](#9-benchmarks)
-10. [Coverage — what's a good number?](#10-coverage--whats-a-good-number)
+10. [Coverage what's a good number?](#10-coverage--whats-a-good-number)
 11. [Test helpers and golden files](#11-test-helpers-and-golden-files)
 12. [Integration vs. unit tests](#12-integration-vs-unit-tests)
 
 ---
 
-## 1. Table-driven tests — the default
+## 1. Table-driven tests the default
 
 Unless you have a concrete reason not to, every test is table-driven. One test function per
 logical unit, one struct per case, loop over cases calling `t.Run`.
@@ -36,10 +36,10 @@ func TestParseAmount(t *testing.T) {
         want    decimal.Decimal
         wantErr error
     }{
-        {"happy — integer", "42", decimal.New(42, 0), nil},
-        {"happy — decimal", "3.14", decimal.New(314, -2), nil},
-        {"error — empty",   "",    decimal.Zero,       ErrEmptyAmount},
-        {"error — garbage", "abc", decimal.Zero,       ErrInvalidAmount},
+        {"happy integer", "42", decimal.New(42, 0), nil},
+        {"happy decimal", "3.14", decimal.New(314, -2), nil},
+        {"error empty",   "",    decimal.Zero,       ErrEmptyAmount},
+        {"error garbage", "abc", decimal.Zero,       ErrInvalidAmount},
     }
 
     for _, tc := range tests {
@@ -65,7 +65,7 @@ func TestParseAmount(t *testing.T) {
 - `go test -run TestParseAmount/happy` runs just the happy paths.
 - Each case has a descriptive `name` that shows up in verbose output.
 - `t.Parallel()` lets the Go test framework interleave slow cases.
-- When a case fails, the error message tells you *which* case — no detective work.
+- When a case fails, the error message tells you *which* case no detective work.
 
 **Reject this pattern only when:** the cases genuinely can't share a body (e.g. each needs a
 radically different setup). Then write separate test functions.
@@ -78,27 +78,27 @@ the framework pauses the current test, runs other parallel tests, then resumes.
 **Three rules for parallel subtests:**
 
 1. **Call `t.Parallel()` at the top of both** the outer function and the subtest. Just the
-   outer isn't enough — the subtests still run sequentially among themselves.
+   outer isn't enough the subtests still run sequentially among themselves.
 2. **Don't share mutable state across parallel cases.** Each case must own its own inputs and
    outputs. A `tests` slice of structs satisfies this naturally (each `tc` is a value copy).
 3. **Pre-Go 1.22: capture the loop variable.** `tc := tc` inside the outer loop. Go 1.22+
    handles this automatically, but verify your `go.mod`.
 
-Parallel tests expose race conditions the race detector can then catch — it's a two-for-one.
+Parallel tests expose race conditions the race detector can then catch it's a two-for-one.
 
 ## 3. Test naming conventions
 
-- `TestFunctionName` — unit test for `FunctionName`.
-- `TestTypeName_MethodName` — for methods.
+- `TestFunctionName` unit test for `FunctionName`.
+- `TestTypeName_MethodName` for methods.
 - Subtest names are sentences, lowercase, describing the scenario: `"returns error on empty
-  input"` or `"happy — two digits"`. These end up in failure messages, so they should read
+  input"` or `"happy two digits"`. These end up in failure messages, so they should read
   well.
 
 Go proverbs: **"A test should have one clear reason to fail."** Each subtest exercises one
-behavior. If a case needs three assertions, that's fine — they all describe the one behavior.
+behavior. If a case needs three assertions, that's fine they all describe the one behavior.
 If a case exercises three independent behaviors, split it.
 
-## 4. Error assertions — what to compare and how
+## 4. Error assertions what to compare and how
 
 Never compare error strings. Use `errors.Is` for sentinel checks, `errors.As` for custom
 types:
@@ -126,11 +126,11 @@ if (err != nil) != tc.wantErr {
 ```
 
 **`t.Errorf` vs `t.Fatalf`:**
-- `Errorf` logs and continues — use when the test can still produce useful info afterward.
-- `Fatalf` logs and stops the current test — use when subsequent assertions would be
+- `Errorf` logs and continues use when the test can still produce useful info afterward.
+- `Fatalf` logs and stops the current test use when subsequent assertions would be
   meaningless (e.g. "got nil, can't dereference").
 
-## 5. `testing/synctest` — deterministic concurrency tests
+## 5. `testing/synctest` deterministic concurrency tests
 
 **This is the single biggest testing improvement in recent Go.** Stable in Go 1.25.
 
@@ -179,7 +179,7 @@ time coordination logic; mock out the I/O.
 **Pre-1.25:** `GOEXPERIMENT=synctest` + `synctest.Run`. Pre-1.24: use `go.uber.org/goleak`
 for leak detection and accept that pure time-based tests will be flaky.
 
-## 6. Race detector — always on
+## 6. Race detector always on
 
 ```bash
 go test -race ./...
@@ -192,7 +192,7 @@ without synchronization and at least one is a write, it reports the race with st
 
 - Run `-race` on every CI build.
 - Run it locally before committing any code that spawns goroutines.
-- 2-10× slower runtime — fine for tests; don't ship race-enabled binaries to production.
+- 2-10× slower runtime fine for tests; don't ship race-enabled binaries to production.
 - Catches *observed* races only. If a race never happens during the test run, it's not
   reported. So high code coverage + parallel tests + race detector together are what give
   confidence.
@@ -204,7 +204,7 @@ are for).
 ## 7. Mocks, fakes, and stubs
 
 Go's interfaces make test doubles simple. **Prefer hand-written fakes over generated mocks**
-for clarity — an agent can write a three-line fake in seconds, and the reader doesn't have to
+for clarity an agent can write a three-line fake in seconds, and the reader doesn't have to
 chase magic.
 
 **Fake (stateful, behaves like a simplified real):**
@@ -235,7 +235,7 @@ better than interaction verification.
 ### Where to put test doubles
 
 For types used in several tests in the same package, put the fake in a `_test.go` file in that
-package. For cross-package doubles, a `<pkg>/mocks` or `<pkg>/testutil` package works — but
+package. For cross-package doubles, a `<pkg>/mocks` or `<pkg>/testutil` package works but
 keep it under `internal/` to avoid shipping test scaffolding.
 
 ### Mocking concrete types
@@ -257,7 +257,7 @@ Now the test passes `fakeUserStore`, production passes the real `*UserClient`.
 
 ## 8. Fuzz testing
 
-`go test -fuzz=.` runs fuzz tests — generates random inputs to find edge cases.
+`go test -fuzz=.` runs fuzz tests generates random inputs to find edge cases.
 
 ```go
 func FuzzParseAmount(f *testing.F) {
@@ -285,7 +285,7 @@ func FuzzParseAmount(f *testing.F) {
 **When fuzz tests pay off:** parsers, encoders/decoders, anything that takes bytes from the
 outside world. Run in CI with a time budget (`-fuzztime=30s`).
 
-**The fuzz corpus lives in `testdata/fuzz/FuzzName/`.** Commit it — each discovered bug is a
+**The fuzz corpus lives in `testdata/fuzz/FuzzName/`.** Commit it each discovered bug is a
 regression test.
 
 ## 9. Benchmarks
@@ -328,9 +328,9 @@ go test -bench=. -count=10 > new.txt
 benchstat old.txt new.txt
 ```
 
-Look for "p<0.05" rows — those are statistically significant.
+Look for "p<0.05" rows those are statistically significant.
 
-## 10. Coverage — what's a good number?
+## 10. Coverage what's a good number?
 
 ```bash
 go test -cover ./...
@@ -410,7 +410,7 @@ Run with `go test -tags=integration ./...`. Skip by default in local dev and uni
 run in a separate CI stage with real dependencies.
 
 **The test pyramid in Go:** lots of unit tests, some integration tests, a few end-to-end
-tests. In Go, this is easy because the language rewards small, testable functions — you rarely
+tests. In Go, this is easy because the language rewards small, testable functions you rarely
 need complex fixtures.
 
 ### `testmain` for setup/teardown

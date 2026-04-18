@@ -85,13 +85,11 @@ func TestConcurrentPutGet(t *testing.T) {
 	t.Parallel()
 	s := NewStore(0)
 	var wg sync.WaitGroup
-	for i := 0; i < 64; i++ {
+	for i := range 64 {
 		i := i
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			s.Put(Subscription{GroupID: "g", MemberID: "m" + itoa(i), Topics: []string{"t"}})
-		}()
+		})
 	}
 	wg.Wait()
 	if s.Len() != 64 {

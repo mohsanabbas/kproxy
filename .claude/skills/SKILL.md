@@ -3,7 +3,7 @@ name: golang-dev
 description: >
   Expert Go (Golang) development skill for coding agents, targeting Go 1.26+. Deeply focused on
   CSP concurrency (channels, goroutines, select, pipelines, fan-in/fan-out, worker pools, bounded
-  parallelism, context cancellation) and the gotchas that trip up agents — goroutine leaks, loop
+  parallelism, context cancellation) and the gotchas that trip up agents goroutine leaks, loop
   variable capture, unbuffered-channel deadlocks, `select` default misuse, `sync.Pool` traps, race
   conditions. Also enforces idiomatic Go per Effective Go and the "10x" commandments: useful zero
   values, wrapped errors (`%w`), sentinel errors, directional channels, structured concurrency
@@ -11,7 +11,7 @@ description: >
   deterministic concurrency tests, `slog` for structured logging, `go vet` + `golangci-lint` +
   `gosec` as mandatory gates.
   USE THIS SKILL whenever the user asks to write, review, refactor, test, debug, or design ANY Go
-  code — even casually: "add a worker that...", "why does this goroutine hang?", "parallelize
+  code even casually: "add a worker that...", "why does this goroutine hang?", "parallelize
   this...", "speed up this loop", ".go file", "channel", "goroutine", "golang", "concurrent",
   "pipeline", "fan-out", "context cancel", "race condition", "deadlock", "go test", "go mod",
   "errgroup", "sync.WaitGroup". Trigger it even when the user says "just a quick Go snippet".
@@ -29,25 +29,25 @@ turn-by-turn.
 
 **Target: Go 1.26+.** That means loop variables are per-iteration (Go 1.22+), `sync.WaitGroup.Go`
 exists (Go 1.25+), `testing/synctest` is stable (Go 1.25+), and the modernizing `go fix` is in
-(Go 1.26). Write code that assumes these — don't regress to older idioms.
+(Go 1.26). Write code that assumes these don't regress to older idioms.
 
 ## The three laws (non-negotiable)
 
-1. **Share memory by communicating** — Pike's mantra. When two goroutines need to agree on
+1. **Share memory by communicating** Pike's mantra. When two goroutines need to agree on
    something, the first design to reach for is a channel, not a mutex. Mutexes are legitimate
-   for small problems (reference counts, caches) — see `references/sync-primitives.md` — but
+   for small problems (reference counts, caches) see `references/sync-primitives.md` but
    channel-based designs compose better and race less.
-2. **The zero value is useful** — `sync.Mutex{}`, `bytes.Buffer{}`, `strings.Builder{}`, and
+2. **The zero value is useful** `sync.Mutex{}`, `bytes.Buffer{}`, `strings.Builder{}`, and
    `slog.Logger{}` work out of the box. Design your own types so `var x T` is immediately valid.
    Only write a constructor (`NewX`) when the zero value can't work (e.g. needs a non-nil map,
    a socket, or validation).
-3. **Errors are values, not signals** — return them, wrap them with `%w`, match them with
+3. **Errors are values, not signals** return them, wrap them with `%w`, match them with
    `errors.Is`/`errors.As`, never compare with `==` or string-match. `panic` is for *impossible*
    states; never for expected failure. See `references/errors.md`.
 
 ## Concurrency: the CSP mindset (this is the skill's heart)
 
-### When NOT to use concurrency — read this first
+### When NOT to use concurrency read this first
 
 Goroutines look cheap, so the temptation is to sprinkle `go` everywhere. Resist. **Start with a
 sequential solution and measure.** Add concurrency only when you have a concrete reason:
@@ -61,7 +61,7 @@ not.
 
 ### The four rules every goroutine must obey
 
-Every `go func(){...}()` you write must satisfy all four — if any is unclear, refactor:
+Every `go func(){...}()` you write must satisfy all four if any is unclear, refactor:
 
 1. **Clear owner.** Someone (usually the caller that spawned it) is responsible for its
    lifetime. "Just run in the background forever" is a leak waiting to happen.
@@ -75,7 +75,7 @@ Every `go func(){...}()` you write must satisfy all four — if any is unclear, 
    goroutine. Use `errgroup.Group`, or a dedicated error channel, or `sync.WaitGroup` + error
    slice.
 
-### Channel idioms — memorize these
+### Channel idioms memorize these
 
 Directional channels in function signatures document intent and prevent deadlocks:
 
@@ -94,7 +94,7 @@ on `<-done`. This is the cheapest, most idiomatic cancellation signal. `context.
 `done` + metadata; use `ctx` for anything that crosses an API boundary.
 
 **Buffered vs. unbuffered:** unbuffered = handshake (rendezvous between sender and receiver).
-Buffered = mailbox (sender doesn't wait unless buffer is full). **Default to unbuffered** — it
+Buffered = mailbox (sender doesn't wait unless buffer is full). **Default to unbuffered** it
 surfaces design problems loudly via deadlock; buffered channels can hide them.
 
 ### The canonical patterns
@@ -140,7 +140,7 @@ func stage(ctx context.Context, in <-chan Input) <-chan Output {
 See `assets/templates/pipeline.go`, `assets/templates/worker-pool.go`, and
 `assets/templates/errgroup.go` for drop-in starting points.
 
-### Pipeline construction — the two rules
+### Pipeline construction the two rules
 
 From Sameer Ajmani's Pipelines and cancellation:
 
@@ -154,18 +154,18 @@ If you forget rule 2, the classic leak happens: consumer returns early → produ
 on a send nobody will receive → goroutine and its heap references live until process exit. The
 `done` channel / `ctx` + `select`-on-send pattern (shown in the template above) is the fix.
 
-### Context — the standard cancellation vehicle
+### Context the standard cancellation vehicle
 
 Every function that does I/O, calls a downstream service, or spawns a goroutine takes
 `ctx context.Context` as its **first** argument. Never store `ctx` in a struct (one exception:
 long-lived per-request objects). Check `ctx.Err()` or `<-ctx.Done()` in any loop that might run
-longer than a few milliseconds. Propagate `ctx` — don't create `context.Background()` inside a
+longer than a few milliseconds. Propagate `ctx` don't create `context.Background()` inside a
 library function.
 
 ```go
 func (s *Service) Fetch(ctx context.Context, id string) (Record, error) {
     ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-    defer cancel() // ALWAYS on the line after WithX — never skip
+    defer cancel() // ALWAYS on the line after WithX never skip
     // ... use ctx for HTTP, DB, downstream calls
 }
 ```
@@ -173,7 +173,7 @@ func (s *Service) Fetch(ctx context.Context, id string) (Record, error) {
 ## Gotchas that burn coding agents
 
 These are the ones I've seen trip up AI-written Go most often. Full list with code in
-`references/gotchas.md` — these are the must-knows:
+`references/gotchas.md` these are the must-knows:
 
 1. **Goroutine leak via unreceived send.** `go func(){ ch <- v }()` where nobody reads `ch` =
    leak forever. Always pair with cancellation or buffered channel sized to guarantee delivery.
@@ -184,7 +184,7 @@ These are the ones I've seen trip up AI-written Go most often. Full list with co
 4. **Capturing loop variables in pre-1.22 code.** Fixed in Go 1.22+, but if your `go.mod` says
    `go 1.21` or earlier, `for _, v := range s { go f(v) }` captures `v` by reference and every
    goroutine sees the last value. Fix: `v := v` inside the loop, or pass as parameter. Since
-   we target 1.26+, this should not bite you — but you'll read a lot of older code. Verify the
+   we target 1.26+, this should not bite you but you'll read a lot of older code. Verify the
    `go.mod` directive.
 5. **`time.After` in a loop leaks timers** until they fire. Use `time.NewTimer` + `Stop()` or
    `context.WithTimeout` for repeating timeouts inside a long-running `select`.
@@ -196,10 +196,10 @@ These are the ones I've seen trip up AI-written Go most often. Full list with co
    or redesign so there's exactly one closer.
 8. **`WaitGroup.Add` inside the goroutine.** `wg.Add(1)` must happen in the *spawning*
    goroutine before `go f()`; otherwise `wg.Wait()` can race past. Go 1.25's `wg.Go(f)`
-   sidesteps this entirely — prefer it.
+   sidesteps this entirely prefer it.
 9. **Mutex copied by value** (e.g. passing a struct containing `sync.Mutex` by value) silently
    creates two independent mutexes. Always pointer-receive methods on types with a mutex.
-   `go vet` catches this — run it.
+   `go vet` catches this run it.
 10. **Forgetting `cancel()` on `context.WithCancel/WithTimeout/WithDeadline`.** The linter
     `govet`'s `lostcancel` catches this. Always `defer cancel()` on the next line.
 11. **`http.DefaultClient` / `http.DefaultTransport` without timeout.** In production, these
@@ -215,7 +215,7 @@ These are the ones I've seen trip up AI-written Go most often. Full list with co
     forces a heap copy. Use pointer receivers for interface-satisfying types on hot paths;
     diagnose with `go build -gcflags="-m"`.
 16. **`any`/`interface{}` in domain types.** Go 1.18+ has generics. Use `[T any]` constraints
-    instead of untyped `any` — the compiler will catch more bugs.
+    instead of untyped `any` the compiler will catch more bugs.
 17. **Ignoring errors with `_`** outside of truly intentional cases (and always comment why).
     `errcheck` / `gosec G104` catch these.
 
@@ -232,7 +232,7 @@ reconsider. Template in `assets/templates/table_test.go`.
 race detector is the single highest-leverage tool Go ships. Write code that passes it.
 
 **`testing/synctest` for concurrency tests (Go 1.25+, stable).** Deterministic goroutine
-scheduling and fake time inside a "bubble" — your `time.Sleep(1 * time.Hour)` runs
+scheduling and fake time inside a "bubble" your `time.Sleep(1 * time.Hour)` runs
 instantaneously and predictably. This replaces flaky, timing-dependent concurrency tests with
 fast, deterministic ones. Pattern:
 
@@ -263,7 +263,7 @@ Summary (full treatment in `references/errors.md`):
 - Match with `errors.Is(err, ErrNotFound)` and `errors.As(err, &pathErr)`.
 - For richer errors, make a struct that implements `Error()` and `Unwrap()`.
 - `panic` only for truly-impossible states (invariant violations). Never for user input, I/O
-  failures, or missing resources — those are expected errors.
+  failures, or missing resources those are expected errors.
 - `recover` has a legitimate role at goroutine boundaries in long-running servers (so one
   crashing handler doesn't take the process down). Don't use `recover` as general error handling.
 
@@ -290,7 +290,7 @@ Drawn from Effective Go + the 10x commandments:
 - **No magic numbers or strings:** `const` blocks, `iota`, or typed constants.
 - **Use `go:embed`** for static assets instead of reading files at runtime.
 
-## Quality gates — run before calling a task done
+## Quality gates run before calling a task done
 
 ```bash
 gofmt -s -w ./...                        # formatting (MUST be clean)
@@ -309,7 +309,7 @@ Thresholds:
 
 ## Agentic workflow for Go tasks
 
-When the user hands you a Go task, follow this loop — don't skip steps:
+When the user hands you a Go task, follow this loop don't skip steps:
 
 1. **Clarify or commit.** Either ask one targeted question (only if the task is genuinely
    ambiguous), or commit to an interpretation and state it explicitly before coding. Mohsan's
@@ -343,7 +343,7 @@ When the user hands you a Go task, follow this loop — don't skip steps:
 
 | File | Purpose |
 |------|---------|
-| `assets/.golangci.yml`                 | Strict linter config — drop into any project |
+| `assets/.golangci.yml`                 | Strict linter config drop into any project |
 | `assets/templates/pipeline.go`         | Copy-paste pipeline stage with cancellation |
 | `assets/templates/worker-pool.go`      | Copy-paste bounded worker pool |
 | `assets/templates/errgroup.go`         | Copy-paste errgroup-based parallel tasks |

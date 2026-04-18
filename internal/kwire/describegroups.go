@@ -66,7 +66,7 @@ func DecodeDescribeGroupsResponse(body []byte) (DescribeGroupsResponse, error) {
 	}
 	if n > 0 {
 		r.Groups = make([]DescribedGroup, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			g := DescribedGroup{}
 			if g.ErrorCode, err = c.ReadInt16(); err != nil {
 				return r, err
@@ -89,7 +89,7 @@ func DecodeDescribeGroupsResponse(body []byte) (DescribeGroupsResponse, error) {
 			}
 			if mn > 0 {
 				g.Members = make([]DescribedGroupMember, mn)
-				for j := 0; j < mn; j++ {
+				for j := range mn {
 					m := DescribedGroupMember{}
 					if m.MemberID, err = c.ReadCompactString(); err != nil {
 						return r, err

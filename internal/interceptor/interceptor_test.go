@@ -1,7 +1,6 @@
 package interceptor
 
 import (
-	"context"
 	"net"
 	"sync"
 	"testing"
@@ -35,12 +34,10 @@ func TestInterceptor_RewritesMetadataEndToEnd(t *testing.T) {
 	defer brokerApp.Close()
 
 	conn := proxy.New(proxy.Config{}, clientSide, brokerSide, ic)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() { defer wg.Done(); _ = conn.Run(ctx) }()
+	wg.Go(func() { ; _ = conn.Run(ctx) })
 
 	// Build & send a Metadata v9 request from the fake client.
 	reqHdr := kwire.AppendRequestHeader(nil, kwire.RequestHeader{

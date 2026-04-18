@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"bytes"
-	"context"
 	"net"
 	"testing"
 	"time"
@@ -27,8 +26,7 @@ func TestPending_RewriteRequest_ReplacesUpstreamPayload(t *testing.T) {
 
 	replacement := []byte{0xDE, 0xAD, 0xBE, 0xEF}
 	conn := New(Config{}, clientSide, brokerSide, rewritingInterceptor{replacement: replacement})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	go func() { _ = conn.Run(ctx) }()
 
 	// Client sends a request with a known payload.

@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -171,7 +172,7 @@ func (p *Poller) tick(ctx context.Context) {
 			for id := range parts {
 				ids = append(ids, id)
 			}
-			sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+			slices.Sort(ids)
 			lp := make([]kwire.ListOffsetsPartition, len(ids))
 			for i, id := range ids {
 				lp[i] = kwire.ListOffsetsPartition{
@@ -224,7 +225,7 @@ func (p *Poller) tick(ctx context.Context) {
 				for id := range parts {
 					ids = append(ids, id)
 				}
-				sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+				slices.Sort(ids)
 				topics = append(topics, kwire.OffsetFetchTopicReq{Name: topic, PartitionIndexes: ids})
 			}
 			ofReq.Groups = append(ofReq.Groups, kwire.OffsetFetchGroup{

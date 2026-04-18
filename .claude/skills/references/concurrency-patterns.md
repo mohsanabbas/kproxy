@@ -1,8 +1,8 @@
-# Go Concurrency Patterns — Complete Catalog
+# Go Concurrency Patterns Complete Catalog
 
 This is the deep reference for Go concurrency, synthesized from Rob Pike's 2012 Google I/O talk,
 Sameer Ajmani's Pipelines and cancellation blog post, and the lotusirous/go-concurrency-patterns
-repository. Every pattern here is runnable — copy, adapt, ship.
+repository. Every pattern here is runnable copy, adapt, ship.
 
 ## Table of contents
 
@@ -22,8 +22,8 @@ repository. Every pattern here is runnable — copy, adapt, ship.
 14. [Pattern: Tee (broadcast to multiple consumers)](#14-pattern-tee-broadcast-to-multiple-consumers)
 15. [Pattern: Semaphore via buffered channel](#15-pattern-semaphore-via-buffered-channel)
 16. [Pattern: Ring buffer](#16-pattern-ring-buffer)
-17. [`errgroup` — structured concurrency for the common case](#17-errgroup--structured-concurrency-for-the-common-case)
-18. [Choosing a pattern — decision tree](#18-choosing-a-pattern--decision-tree)
+17. [`errgroup` structured concurrency for the common case](#17-errgroup--structured-concurrency-for-the-common-case)
+18. [Choosing a pattern decision tree](#18-choosing-a-pattern--decision-tree)
 
 ---
 
@@ -33,18 +33,18 @@ A goroutine is an independently executing function, scheduled cooperatively by t
 onto a smaller pool of OS threads (controlled by `GOMAXPROCS`). Key properties that change how
 you design:
 
-- **Cheap** — ~2 KB initial stack, grows as needed. Having 100,000 is normal; having 10 million
-  is not — goroutines have scheduler and memory overhead that adds up.
-- **Multiplexed** — the runtime moves blocked goroutines off their OS thread so others can run.
+- **Cheap** ~2 KB initial stack, grows as needed. Having 100,000 is normal; having 10 million
+  is not goroutines have scheduler and memory overhead that adds up.
+- **Multiplexed** the runtime moves blocked goroutines off their OS thread so others can run.
   This is why I/O-bound Go programs scale so well without explicit async/await.
-- **Not garbage-collected individually** — a goroutine that blocks forever leaks until process
+- **Not garbage-collected individually** a goroutine that blocks forever leaks until process
   exit, along with every heap object its stack references.
-- **No inherent identity** — there's no goroutine ID you can rely on. Don't build systems that
+- **No inherent identity** there's no goroutine ID you can rely on. Don't build systems that
   need per-goroutine state outside of goroutine-local arguments and return values.
 
 > "Concurrency is the composition of independently executing computations. It is a way to
 > structure software, particularly as a way to write clean code that interacts well with the
-> real world." — Rob Pike, 2012.
+> real world." Rob Pike, 2012.
 
 ### The go statement has no error handling
 
@@ -76,7 +76,7 @@ directional := make(chan<- int)     // rarely useful; usually you narrow via fun
 | Recv on closed ch   | Returns zero value, `ok=false`            | Drains buffered values first, then zero |
 | `ch == nil` send/recv | **Blocks forever** (useful in `select`!)| Same                                    |
 
-### Directional channels — use them in signatures
+### Directional channels use them in signatures
 
 ```go
 func produce(out chan<- Event) { ... }   // this function can only send
@@ -86,7 +86,7 @@ func consume(in  <-chan Event) { ... }   // this function can only receive
 The compiler enforces the direction, which doubles as documentation and prevents a class of
 deadlocks where a function accidentally both sends and receives on the same channel.
 
-### Closing — who and when
+### Closing who and when
 
 **Only the sender closes, and only when no more values will be sent.**
 
@@ -131,10 +131,10 @@ close(done)  // every goroutine waiting on <-done wakes up with the zero value, 
 ```
 
 This is how `context.Context.Done()` works under the hood. For anything that crosses an API
-boundary, use `context.Context` instead of a raw `done` channel — it carries deadlines and
+boundary, use `context.Context` instead of a raw `done` channel it carries deadlines and
 values too.
 
-### `select` — the concurrency `switch`
+### `select` the concurrency `switch`
 
 ```go
 select {
@@ -153,7 +153,7 @@ Semantics:
 - If none are ready and there's a `default`, `default` runs.
 - If none are ready and there's no `default`, `select` blocks until one is ready.
 
-A **nil channel case blocks forever** — this lets you dynamically disable a case:
+A **nil channel case blocks forever** this lets you dynamically disable a case:
 
 ```go
 var in <-chan T = source  // start with real channel
@@ -218,7 +218,7 @@ func fibonacci(ctx context.Context) <-chan int {
 ```
 
 Go 1.23+ has `range-over-func` iterators (`iter.Seq[T]`) which are cheaper and don't require a
-goroutine — prefer iterators for pure pull-based sequences without I/O.
+goroutine prefer iterators for pure pull-based sequences without I/O.
 
 ## 4. Pattern: Fan-in (merge)
 
@@ -340,7 +340,7 @@ for v := range sq(ctx, sq(ctx, gen(ctx, 2, 3))) {
 
 **The two pipeline rules, restated:**
 
-1. Every stage **closes its outbound channel when done sending** — downstream `range` loops
+1. Every stage **closes its outbound channel when done sending** downstream `range` loops
    exit cleanly.
 2. Every stage **keeps receiving until the inbound channel is closed OR ctx is canceled** —
    otherwise upstream goroutines block forever on their sends.
@@ -493,7 +493,7 @@ func main() {
 }
 ```
 
-In production code, prefer `context.Context` — it carries deadlines and is the standard
+In production code, prefer `context.Context` it carries deadlines and is the standard
 vehicle for request-scoped values. Use raw `done` only inside a package where `ctx` would be
 noise, or in concurrency primitives where no metadata is needed.
 
@@ -523,7 +523,7 @@ func First[T any](ctx context.Context, replicas ...func(context.Context) (T, err
 ```
 
 **Buffer size matters here.** If `c` is unbuffered, late replicas block their goroutines
-forever — a classic leak. Size the buffer to `len(replicas)` so any replica that finishes can
+forever a classic leak. Size the buffer to `len(replicas)` so any replica that finishes can
 deposit its result and exit cleanly.
 
 ## 12. Pattern: Rate limiting
@@ -577,7 +577,7 @@ func (s *sub) Close() error {
     return <-errc
 }
 
-// The loop goroutine owns all shared state — no mutexes needed.
+// The loop goroutine owns all shared state no mutexes needed.
 func (s *sub) loop() {
     var pending []Item
     var next time.Time
@@ -685,10 +685,10 @@ func ringBuffer[T any](in <-chan T, size int) <-chan T {
 }
 ```
 
-Know what semantics you want — dropping old, dropping new, or blocking — before reaching for
+Know what semantics you want dropping old, dropping new, or blocking before reaching for
 this. "Silent data loss" is a legitimate choice for telemetry; never for financial transactions.
 
-## 17. `errgroup` — structured concurrency for the common case
+## 17. `errgroup` structured concurrency for the common case
 
 `golang.org/x/sync/errgroup` is the highest-leverage package for 80% of concurrent Go. Use it
 whenever you have a fixed set of parallel tasks that can each fail:
@@ -716,15 +716,15 @@ func fetchAll(ctx context.Context, ids []int) ([]Record, error) {
 Why this is so good:
 
 - **First error cancels the derived `ctx`**, so all sibling goroutines see `<-ctx.Done()` and can
-  bail out early — no wasted work.
+  bail out early no wasted work.
 - **`g.Wait()` returns the first non-nil error**, exactly what you want 95% of the time.
-- **`g.SetLimit(n)`** caps concurrency — no separate semaphore needed.
+- **`g.SetLimit(n)`** caps concurrency no separate semaphore needed.
 - **The loop variable is safe** in Go 1.22+; each goroutine captures its own `i, id`.
 
 Reach for `errgroup` unless you specifically need streaming/pipeline semantics, in which case
 use raw channels.
 
-## 18. Choosing a pattern — decision tree
+## 18. Choosing a pattern decision tree
 
 Walk this tree top-down:
 

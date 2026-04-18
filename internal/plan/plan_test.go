@@ -85,7 +85,7 @@ func TestComputeDeterminism(t *testing.T) {
 		Partitions: map[string][]int32{"t": {0, 1, 2, 3, 4, 5}},
 	}
 	a := Compute(in)
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		b := Compute(in)
 		if !reflect.DeepEqual(a, b) {
 			t.Fatalf("non-deterministic compute:\n a=%v\n b=%v", a, b)

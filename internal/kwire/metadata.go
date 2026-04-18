@@ -34,13 +34,13 @@ type MetadataBroker struct {
 }
 
 type MetadataTopic struct {
-	ErrorCode             int16
-	Name                  string // v12+ nullable; pre-v12 always present
-	NameNull              bool   // only meaningful at v12+
-	TopicID               [16]byte
-	IsInternal            bool
-	Partitions            []MetadataPartition
-	AuthorizedOperations  int32 // v8+
+	ErrorCode            int16
+	Name                 string // v12+ nullable; pre-v12 always present
+	NameNull             bool   // only meaningful at v12+
+	TopicID              [16]byte
+	IsInternal           bool
+	Partitions           []MetadataPartition
+	AuthorizedOperations int32 // v8+
 }
 
 type MetadataPartition struct {
@@ -282,7 +282,7 @@ func decodeMetadataTopic(c *Cursor, version int16, flex bool) (MetadataTopic, er
 	}
 	if n > 0 {
 		t.Partitions = make([]MetadataPartition, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			p, err := decodeMetadataPartition(c, version, flex)
 			if err != nil {
 				return t, err
@@ -427,7 +427,7 @@ func decodeInt32Array(c *Cursor, flex bool) ([]int32, error) {
 		return nil, nil
 	}
 	out := make([]int32, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		v, err := c.ReadInt32()
 		if err != nil {
 			return nil, err

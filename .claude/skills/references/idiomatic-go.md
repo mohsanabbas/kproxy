@@ -1,4 +1,4 @@
-# Idiomatic Go — Style and Design
+# Idiomatic Go Style and Design
 
 A condensed synthesis of *Effective Go*, the "10x Commandments," and Rob Pike's talks on
 naming and simplicity. This is the style reference an agent should consult whenever the
@@ -14,10 +14,10 @@ question is "what's the Go way to do X?"
 6. [Functional options (`WithX`)](#6-functional-options-withx)
 7. [Composition via embedding](#7-composition-via-embedding)
 8. [Control flow idioms](#8-control-flow-idioms)
-9. [The `init()` function — don't](#9-the-init-function--dont)
+9. [The `init()` function don't](#9-the-init-function--dont)
 10. [Logging with `slog`](#10-logging-with-slog)
 11. [File and directory conventions](#11-file-and-directory-conventions)
-12. [Go proverbs — the short list](#12-go-proverbs--the-short-list)
+12. [Go proverbs the short list](#12-go-proverbs--the-short-list)
 
 ---
 
@@ -26,7 +26,7 @@ question is "what's the Go way to do X?"
 Go naming is terse but consistent. Once you learn the vocabulary, code reads like prose.
 
 **Packages:** short, lowercase, single word, no underscores or mixedCaps. `http`, `bytes`,
-`json` — not `http_client`, `bytesutil`, `JSON`. The package name isn't for disambiguation;
+`json` not `http_client`, `bytesutil`, `JSON`. The package name isn't for disambiguation;
 it's a namespace for the types inside it. `bufio.Reader` works because `bufio` + `Reader` is
 specific; the package doesn't need to be called `bufioreader`.
 
@@ -45,7 +45,7 @@ func (b *Buffer) grow(n int) { ... }
 func (b *Buffer) WriteString(s string) (int, error) { ... }
 ```
 
-**Variables — the shorter the scope, the shorter the name:**
+**Variables the shorter the scope, the shorter the name:**
 
 ```go
 for i, v := range items { ... }              // tight scope: one letter
@@ -58,7 +58,7 @@ func Parse(src []byte) ([]Token, error) {     // function-scope: 3-4 letters
 var DefaultConfig = &Config{...}              // package-scope: descriptive
 ```
 
-**Conventional names — memorize these:**
+**Conventional names memorize these:**
 
 | Name    | Type                      |
 |---------|---------------------------|
@@ -116,7 +116,7 @@ myservice/
 describe in one sentence. If you can't, split it.
 
 **`internal/`** is compiler-enforced: `foo/internal/bar` can only be imported by packages
-under `foo/`. Use it aggressively — if a package is an implementation detail of your module,
+under `foo/`. Use it aggressively if a package is an implementation detail of your module,
 put it in `internal/`. This lets you refactor freely without breaking external users.
 
 **Avoid circular imports.** Go disallows them at compile time. The cycle is almost always a
@@ -175,7 +175,7 @@ it, compilation fails with a clear message.
 var b bytes.Buffer       // ready to use
 b.WriteString("hello")
 
-// BAD design (though this type doesn't exist in stdlib — illustrative)
+// BAD design (though this type doesn't exist in stdlib illustrative)
 var b BrokenBuffer       // have to remember b.Init() first
 b.Init()
 b.WriteString("hello")
@@ -184,7 +184,7 @@ b.WriteString("hello")
 When the zero value can't work (needs a map, a channel, a connection), hide the type behind
 a constructor and return a pointer.
 
-**Keep structs small.** 3–7 fields is comfortable. 15+ is a code smell — either it's really
+**Keep structs small.** 3–7 fields is comfortable. 15+ is a code smell either it's really
 several types mashed together, or it's an "entity" in which case you're fine but consider
 grouping related fields into sub-structs.
 
@@ -207,7 +207,7 @@ type Good struct {
 }
 ```
 
-**Export fields sparingly.** If you export a field, callers can read and write it — you've
+**Export fields sparingly.** If you export a field, callers can read and write it you've
 coupled to the field layout. Prefer unexported fields + methods (`.Owner()`, `.SetOwner(u)`)
 for anything that might gain validation or side-effects later.
 
@@ -283,8 +283,8 @@ srv := NewServer(":8080", WithTimeout(5*time.Second))
 - Some options have interdependencies (an option function can inspect `s` before setting).
 
 **When NOT to:**
-- 1-2 required parameters with no options — just take them as arguments.
-- Options that must be set together — make them required arguments instead.
+- 1-2 required parameters with no options just take them as arguments.
+- Options that must be set together make them required arguments instead.
 
 ## 7. Composition via embedding
 
@@ -308,7 +308,7 @@ s.Log("starting")   // promoted from Logger
 inner's methods to appear on the outer. Common cases: middleware wrapping `http.Handler`,
 decorators wrapping `io.Reader`, types enriching a mutex or logger.
 
-**When NOT to embed:** when you just want access to some methods — prefer a named field.
+**When NOT to embed:** when you just want access to some methods prefer a named field.
 Embedding exports all the inner's methods, which might not be what you want.
 
 **Overriding works via shadowing:** define a method with the same name on the outer type and
@@ -374,7 +374,7 @@ for i := 0; i < n; i++ {
 }
 ```
 
-## 9. The `init()` function — don't
+## 9. The `init()` function don't
 
 `init()` runs at package import time. It's a hidden side effect: reading a file, setting a
 global, phoning home. Some problems:
@@ -387,9 +387,9 @@ global, phoning home. Some problems:
 **Legitimate uses** (rare):
 
 - Registering a driver with `database/sql.Register` (pattern is forced by the stdlib).
-- Registering an HTTP handler with `http.Handle` — also legacy pattern; prefer building your
+- Registering an HTTP handler with `http.Handle` also legacy pattern; prefer building your
   own `http.ServeMux`.
-- Compiling a regex used throughout the package — but `sync.OnceValue` is better for this.
+- Compiling a regex used throughout the package but `sync.OnceValue` is better for this.
 
 For everything else, do setup in `main` or a `Setup()` function the caller invokes
 explicitly.
@@ -413,12 +413,12 @@ slog.Error("request failed",
     "duration_ms", time.Since(start).Milliseconds())
 ```
 
-**Structured, not formatted.** Don't build strings — pass key-value pairs. This keeps logs
+**Structured, not formatted.** Don't build strings pass key-value pairs. This keeps logs
 machine-parseable (grep, Elasticsearch, Datadog all love structured logs).
 
 **Log at actionable levels.** A log line should tell the reader either (a) that something
 went wrong and here's what, or (b) a major lifecycle event (startup, shutdown, config
-reload). Don't log "entering function foo" — that's what traces are for.
+reload). Don't log "entering function foo" that's what traces are for.
 
 **Never log secrets.** Passwords, API keys, PII. If an internal type has sensitive fields,
 make it implement `slog.LogValuer` to redact them:
@@ -437,12 +437,12 @@ request IDs and trace info.
 
 ## 11. File and directory conventions
 
-**One logical unit per file.** Not one function, not one type — a group of closely related
+**One logical unit per file.** Not one function, not one type a group of closely related
 types/functions. Split when a file exceeds ~500 lines or when two halves of it are about
 different concerns.
 
 **Test files next to the code:** `user.go` + `user_test.go` in the same directory. Test files
-can be in `package foo` (white-box tests) or `package foo_test` (black-box tests — only
+can be in `package foo` (white-box tests) or `package foo_test` (black-box tests only
 exported API). Prefer black-box when testing the public interface; white-box only when you
 need to test an unexported helper directly.
 
@@ -458,7 +458,7 @@ DO NOT EDIT.`. Check generated code in so it's reviewable, but keep the generato
 package userdb
 ```
 
-## 12. Go proverbs — the short list
+## 12. Go proverbs the short list
 
 From Rob Pike's 2015 talk, these have aged well:
 
@@ -478,4 +478,4 @@ From Rob Pike's 2015 talk, these have aged well:
 - **Documentation is for users.** (Write godoc for the reader, not yourself.)
 
 These sit above any specific rule. When a style choice is unclear, check against the
-proverbs — most questions answer themselves.
+proverbs most questions answer themselves.

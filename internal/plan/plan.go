@@ -18,6 +18,7 @@
 package plan
 
 import (
+	"slices"
 	"sort"
 
 	"github.com/mohsanabbas/kproxy/internal/kwire"
@@ -113,18 +114,15 @@ func Compute(in Inputs) Plan {
 	//   weight = max(1, scale - min(scale-1, lag/lagDivisor))
 	// so members with lag=0 get the highest weight, and weights stay bounded.
 	const (
-		scale       = 100
-		lagDivisor  = 1000 // 1k messages of lag drops one weight unit
+		scale      = 100
+		lagDivisor = 1000 // 1k messages of lag drops one weight unit
 	)
 	weight := make(map[string]int, len(memberIDs))
 	for _, mid := range memberIDs {
 		m := memberByID[mid]
 		w := scale
 		if m.Lag > 0 {
-			drop := int(m.Lag / lagDivisor)
-			if drop >= scale-1 {
-				drop = scale - 1
-			}
+			drop := min(int(m.Lag/lagDivisor), scale-1)
 			w -= drop
 		}
 		if w < 1 {
@@ -218,7 +216,7 @@ func Compute(in Inputs) Plan {
 	// stable across rebalances of identical inputs, otherwise tests flake).
 	for _, byTopic := range out {
 		for topic, ps := range byTopic {
-			sort.Slice(ps, func(i, j int) bool { return ps[i] < ps[j] })
+			slices.Sort(ps)
 			byTopic[topic] = ps
 		}
 	}
@@ -271,8 +269,8 @@ func hasAny(byTopic map[string][]int32) bool {
 // remove. We keep insertion order for determinism: Compute iterates topics
 // and partitions in sorted order before adding to the pool.
 type freePool struct {
-	keys  []freeKey                // ordered; nil entries mean removed
-	index map[freeKey]int          // key → position in keys; missing = removed
+	keys  []freeKey       // ordered; nil entries mean removed
+	index map[freeKey]int // key → position in keys; missing = removed
 }
 
 type freeKey struct {

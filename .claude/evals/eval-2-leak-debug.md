@@ -8,7 +8,7 @@ Imagine `items` has 100 entries and we break after 10 results. At the point of `
 
 1. **The consumer (main goroutine) returns.** No more reads from `out`.
 2. **The transform goroutine** is partway through the stream. It calls `out <- transform(it)` for
-   the 11th time. Nothing is reading `out`, so this send blocks forever — `out` is unbuffered,
+   the 11th time. Nothing is reading `out`, so this send blocks forever `out` is unbuffered,
    and we just lost our only receiver.
 3. **The transform goroutine being stuck means it never reads the next value from `in`.**
 4. **The feeder goroutine** is partway through the loop. Its next `in <- it` blocks forever,
@@ -16,7 +16,7 @@ Imagine `items` has 100 entries and we break after 10 results. At the point of `
 5. **Both goroutines leak, along with every heap object their stacks reference.**
 
 In tests, `items` is probably short (say, 10 elements), so the break condition is exactly
-satisfied and there's nothing left to enqueue — no block. In production, `items` is 1,000+
+satisfied and there's nothing left to enqueue no block. In production, `items` is 1,000+
 and the leak triggers every call.
 
 This is the exact bug Sameer Ajmani's *Pipelines and cancellation* post was written to
@@ -25,7 +25,7 @@ prevent. The skill's two pipeline rules state it directly:
 1. Stages close their outbound channels when all sends are done.
 2. **Stages keep receiving until the inbound channel closes OR a cancel signal arrives.**
 
-`ProcessAll` violates rule 2 because there's no cancel signal — when the consumer bails early,
+`ProcessAll` violates rule 2 because there's no cancel signal when the consumer bails early,
 upstream stages have no way to know.
 
 ## The fix
@@ -74,7 +74,7 @@ func ProcessAll(ctx context.Context, items []Item) []Result {
 		results = append(results, r)
 		if len(results) >= limit {
 			cancel() // broadcast "stop" to both upstream goroutines
-			// Keep draining `out` until transform closes it — otherwise the
+			// Keep draining `out` until transform closes it otherwise the
 			// transform's send could race with our cancel. The range continues
 			// but transform's select will pick ctx.Done() next iteration.
 			for range out {
@@ -98,7 +98,7 @@ The key additions:
   goroutine doesn't own. This is rule 2 in code form. Without it, a stuck send is a leak.
 - **`cancel()` then drain `out`.** When we've collected enough results, we broadcast the stop
   signal. The drain loop `for range out {}` ensures we see the `out` channel close before
-  returning — otherwise there's a brief window where the transform goroutine might be mid-send
+  returning otherwise there's a brief window where the transform goroutine might be mid-send
   and technically leak until it notices ctx.
 
 ## Shorter alternative: `done` channel

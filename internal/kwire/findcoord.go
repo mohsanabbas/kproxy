@@ -15,8 +15,8 @@ package kwire
 // We keep both shapes in one struct: the v0..3 fields are populated when
 // Version <= 3, and Coordinators is populated when Version >= 4.
 type FindCoordinatorResponse struct {
-	Version          int16
-	ThrottleTimeMs   int32 // v1+
+	Version        int16
+	ThrottleTimeMs int32 // v1+
 
 	// v0..v3 single-coordinator shape
 	ErrorCode        int16
@@ -96,7 +96,7 @@ func DecodeFindCoordinatorResponse(body []byte, version int16) (FindCoordinatorR
 		}
 		if n > 0 {
 			r.Coordinators = make([]FindCoordinatorEntry, n)
-			for i := 0; i < n; i++ {
+			for i := range n {
 				e, err := decodeFindCoordEntry(&c, flex)
 				if err != nil {
 					return r, err

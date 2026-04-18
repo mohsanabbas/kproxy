@@ -122,7 +122,7 @@ func ParseFlag(spec string) (*Mapping, error) {
 	if strings.TrimSpace(spec) == "" {
 		return m, nil
 	}
-	for _, raw := range strings.Split(spec, ",") {
+	for raw := range strings.SplitSeq(spec, ",") {
 		part := strings.TrimSpace(raw)
 		if part == "" {
 			continue

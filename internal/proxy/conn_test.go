@@ -158,7 +158,7 @@ func TestInterceptorOnlyFiresForSelectedAPIs(t *testing.T) {
 		br := frame.NewReader(p.brokerEnd, frame.MaxFrameSize)
 		buf := frame.Get()
 		defer frame.Release(buf)
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			if _, err := br.ReadFrame(buf); err != nil {
 				drained <- err
 				return

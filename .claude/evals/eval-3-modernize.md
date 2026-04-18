@@ -1,10 +1,10 @@
-# Modernization Review — 2019 Code → Go 1.26
+# Modernization Review 2019 Code → Go 1.26
 
 Walking through the issues first, then the rewrite.
 
 ## What's wrong (in order of severity)
 
-### 1. Data race in `RunAll` — the loop-variable capture bug
+### 1. Data race in `RunAll` the loop-variable capture bug
 
 ```go
 for i, item := range items {
@@ -18,7 +18,7 @@ for i, item := range items {
 ```
 
 Pre-Go 1.22, `i` and `item` were shared across iterations. Every goroutine ended up writing
-to `results[len(items)-1]` with the last item string — some results would be overwritten,
+to `results[len(items)-1]` with the last item string some results would be overwritten,
 others never written, race detector fires immediately. In 2019 code, this is almost certainly
 latent (probably masked by the 1-second sleep ordering).
 
@@ -41,12 +41,12 @@ var mu sync.Mutex
 Package globals are a code smell in Go:
 
 - Can't test in isolation (every test shares the same state).
-- No clear ownership — who resets it? When?
+- No clear ownership who resets it? When?
 - Invites data races (the mutex is right there next to the slice for a reason).
 - Makes the package hard to use from two contexts in the same program.
 
 Also, `mu` is declared but never used in this snippet. If real code locks around `jobs`
-access, fine — but it belongs inside a struct.
+access, fine but it belongs inside a struct.
 
 **Fix:** encapsulate in a struct with its own mutex, constructed via `NewStore()` or similar.
 Or, better, if the caller needs a collection of jobs, let them pass one in.
@@ -71,7 +71,7 @@ explicitly flag `init` avoidance as a "be safe by default" item.
 
 A function that does concurrent work and contains `time.Sleep(time.Second)` must be
 cancelable. If a caller's deadline expires or they want to bail out early, right now they
-can't — they're stuck waiting at least a second. The caller can't even enforce a timeout
+can't they're stuck waiting at least a second. The caller can't even enforce a timeout
 from the outside.
 
 **Every function that spawns goroutines or does I/O takes `ctx context.Context` as its first
@@ -88,7 +88,7 @@ go func() {
 ```
 
 This is the classic 3-line boilerplate that's also the source of a common bug (calling
-`wg.Add(1)` inside the goroutine — which is subtly broken because `Wait()` can race past it).
+`wg.Add(1)` inside the goroutine which is subtly broken because `Wait()` can race past it).
 Go 1.25 added `wg.Go(fn)` that does `Add+go+defer Done` in one call.
 
 ### 6. `fmt.Errorf` without `%w` in `getFirst`
@@ -104,7 +104,7 @@ underlying cause), but a sentinel is.
 
 ### 7. `errgroup` would be better than `sync.WaitGroup`
 
-If `RunAll` could fail (e.g. the work could return an error — even if `time.Sleep` can't,
+If `RunAll` could fail (e.g. the work could return an error even if `time.Sleep` can't,
 realistic replacements will), `errgroup.WithContext` gives you first-error cancellation,
 concurrency limits, and error propagation in one construct. Worth the three lines it saves.
 
@@ -112,7 +112,7 @@ concurrency limits, and error propagation in one construct. Worth the three line
 
 In a hot path, prefer `strings.Builder` or `fmt.Sprintf("processed: %s", item)` with a
 preallocated buffer. For this example, the `time.Sleep(time.Second)` dominates anyway, so
-don't bother — noting for completeness.
+don't bother noting for completeness.
 
 ## Modernized rewrite
 
@@ -136,7 +136,7 @@ type Job struct {
 }
 
 // Store holds a list of jobs with safe concurrent access. The zero value is
-// usable — no constructor needed.
+// usable no constructor needed.
 type Store struct {
 	mu   sync.Mutex
 	jobs []Job
@@ -168,7 +168,7 @@ func RunAll(ctx context.Context, items []string) ([]string, error) {
 
 	// errgroup gives us structured concurrency: first error cancels the
 	// derived ctx, which causes in-flight goroutines to notice and bail.
-	// SetLimit caps concurrent work — tune to your workload.
+	// SetLimit caps concurrent work tune to your workload.
 	g, gctx := errgroupWithContext(ctx)
 	g.SetLimit(8)
 
@@ -239,11 +239,11 @@ go 1.26
 
 Wire in:
 
-- `go vet ./...` — catches the mutex-copy and lost-cancel bugs by default.
+- `go vet ./...` catches the mutex-copy and lost-cancel bugs by default.
 - `golangci-lint run` with `copyloopvar`, `loopclosure`, `errcheck`, `errorlint` enabled —
   flags the old patterns if any snuck back in. (See `assets/.golangci.yml` in the skill for a
   ready config.)
-- `go test -race ./...` — proves the loop-var bug is dead.
+- `go test -race ./...` proves the loop-var bug is dead.
 
 And once, on this codebase, run:
 
@@ -251,7 +251,7 @@ And once, on this codebase, run:
 go fix ./...
 ```
 
-Since Go 1.26, `go fix` is a modernizer — it'll apply dozens of idiom updates automatically.
+Since Go 1.26, `go fix` is a modernizer it'll apply dozens of idiom updates automatically.
 Review the diff, run tests, commit.
 
 ## Summary of changes
@@ -260,11 +260,11 @@ Review the diff, run tests, commit.
 |----------------------------------------|-------------------------------------------------|
 | Mutable package globals `jobs`, `mu`   | `Store` struct with encapsulated state          |
 | Pointless `init()` zeroing a slice     | Removed; zero value of slice is already useful  |
-| `RunAll(items)` — no cancellation      | `RunAll(ctx, items)` — cancelable               |
+| `RunAll(items)` no cancellation      | `RunAll(ctx, items)` cancelable               |
 | `wg.Add + go + defer wg.Done`          | `errgroup.Go` (or `wg.Go` when no errors)       |
 | Implicit data race on `results[i]`     | Fixed by Go 1.22+ loop semantics + `go.mod` bump|
 | `fmt.Errorf("no jobs")`                | `var ErrNoJobs = errors.New("work: no jobs")`   |
-| No concurrency cap                     | `g.SetLimit(8)` — bounded                       |
+| No concurrency cap                     | `g.SetLimit(8)` bounded                       |
 
 (Note: the `errgroupWithContext` referenced above is shorthand for
-`errgroup.WithContext` from `golang.org/x/sync/errgroup` — inline that import.)
+`errgroup.WithContext` from `golang.org/x/sync/errgroup` inline that import.)

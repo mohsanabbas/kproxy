@@ -92,7 +92,7 @@ func DecodeOffsetFetchResponse(body []byte) (OffsetFetchResponse, error) {
 	}
 	if n > 0 {
 		r.Groups = make([]OffsetFetchGroupResp, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			g := OffsetFetchGroupResp{}
 			g.GroupID, err = c.ReadCompactString()
 			if err != nil {
@@ -104,7 +104,7 @@ func DecodeOffsetFetchResponse(body []byte) (OffsetFetchResponse, error) {
 			}
 			if tn > 0 {
 				g.Topics = make([]OffsetFetchTopicResp, tn)
-				for j := 0; j < tn; j++ {
+				for j := range tn {
 					t := OffsetFetchTopicResp{}
 					t.Name, err = c.ReadCompactString()
 					if err != nil {
@@ -116,7 +116,7 @@ func DecodeOffsetFetchResponse(body []byte) (OffsetFetchResponse, error) {
 					}
 					if pn > 0 {
 						t.Partitions = make([]OffsetFetchPartitionResp, pn)
-						for k := 0; k < pn; k++ {
+						for k := range pn {
 							p := OffsetFetchPartitionResp{}
 							if p.PartitionIndex, err = c.ReadInt32(); err != nil {
 								return r, err

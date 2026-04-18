@@ -4,7 +4,7 @@ Go ships every six months. Between Go 1.21 (August 2023) and Go 1.26 (February 2
 language and stdlib gained substantial features that change idiomatic patterns. This file is
 the "stop writing it the old way" reference.
 
-## Quick hit list — what changed
+## Quick hit list what changed
 
 | Feature                      | Version | Impact                                                  |
 |------------------------------|---------|---------------------------------------------------------|
@@ -32,7 +32,7 @@ Below: deeper notes on the ones you'll actually use.
 
 ## Loop variables (Go 1.22)
 
-**Before 1.22** — classic gotcha:
+**Before 1.22** classic gotcha:
 
 ```go
 for _, v := range items {
@@ -40,7 +40,7 @@ for _, v := range items {
 }
 ```
 
-**Go 1.22+** — each iteration gets its own `v`:
+**Go 1.22+** each iteration gets its own `v`:
 
 ```go
 for _, v := range items {
@@ -109,7 +109,7 @@ Replace:
 
 ## `log/slog` (Go 1.21)
 
-Stdlib structured logging — covered in `idiomatic-go.md` section 10. Replaces the
+Stdlib structured logging covered in `idiomatic-go.md` section 10. Replaces the
 hodgepodge of `logrus`, `zap`, `zerolog` for 90% of projects.
 
 ```go
@@ -117,7 +117,7 @@ slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 slog.Info("server started", "addr", addr, "pid", os.Getpid())
 ```
 
-Custom attributes, groups, handlers, redaction — all in the package. Read the godoc once;
+Custom attributes, groups, handlers, redaction all in the package. Read the godoc once;
 you'll rarely need anything else.
 
 ## `range`-over-func iterators (Go 1.23)
@@ -155,7 +155,7 @@ for i, v := range Backwards([]string{"a", "b", "c"}) {
 - Coordination with cancellation across goroutines.
 
 `maps.Keys` and `maps.Values` now return `iter.Seq`, which is a breaking change if you had
-code expecting a slice — use `slices.Collect(maps.Keys(m))` to get a slice back.
+code expecting a slice use `slices.Collect(maps.Keys(m))` to get a slice back.
 
 ## `testing/synctest` (stable in Go 1.25)
 
@@ -168,7 +168,7 @@ in 1.26; don't use in new code.
 
 ```go
 synctest.Test(t, func(tb *testing.T) {
-    // code under test — goroutines and time are deterministic
+    // code under test goroutines and time are deterministic
     synctest.Wait(tb)  // block until all goroutines in bubble are blocked
 })
 ```
@@ -227,12 +227,12 @@ Things it fixes automatically (in 1.26):
 - Converts `for i := 0; i < len(s); i++ { use(s[i]) }` to `for _, v := range s { use(v) }`.
 - Replaces manual min/max with the builtins.
 - Uses `slices.Contains` instead of manual loops.
-- Dozens more — the list grows each release.
+- Dozens more the list grows each release.
 
 **Run `go fix ./...` on any codebase you're modernizing.** Review the diff, run tests, ship.
 It's the lowest-effort way to bring old code up to modern idioms.
 
-You can also publish your own fixers with `//go:fix inline` directives — useful for API
+You can also publish your own fixers with `//go:fix inline` directives useful for API
 migrations within a large codebase.
 
 ## Experimental: `runtime/pprof` `goroutineleak` profile (Go 1.26)
@@ -248,7 +248,7 @@ prof := pprof.Lookup("goroutineleak")
 prof.WriteTo(os.Stdout, 2)
 ```
 
-Reports goroutines that are leaked — started but can never make progress and can't be reached
+Reports goroutines that are leaked started but can never make progress and can't be reached
 by any path. Also exposed via `/debug/pprof/goroutineleak` endpoint if `net/http/pprof` is
 imported.
 
@@ -261,7 +261,7 @@ tests for complete coverage.
 you can now stay in pure Go:
 
 ```go
-// Example sketch — the actual API is architecture-gated
+// Example sketch the actual API is architecture-gated
 import "simd/archsimd"
 
 // Use wide vector types to process 16+ elements per instruction
@@ -289,11 +289,11 @@ heap dumps. Normal application code doesn't need this.
 
 ## New crypto packages (Go 1.26)
 
-- **`crypto/hpke`** — Hybrid Public Key Encryption (RFC 9180). Used in TLS 1.3 Encrypted
+- **`crypto/hpke`** Hybrid Public Key Encryption (RFC 9180). Used in TLS 1.3 Encrypted
   Client Hello and MLS.
-- **`crypto/mlkem`** — Post-quantum key encapsulation (Kyber in its standardized form). Start
+- **`crypto/mlkem`** Post-quantum key encapsulation (Kyber in its standardized form). Start
   considering hybrid schemes for long-lived secrets now.
-- **`testing/cryptotest`** — helpers for testing crypto code deterministically. Previously
+- **`testing/cryptotest`** helpers for testing crypto code deterministically. Previously
   tests relied on overriding `rand.Reader`; now the idiomatic path is built in.
 
 Also in 1.26: `crypto/rand` and similar no longer honor overridden `rand.Reader` by default —
@@ -306,7 +306,7 @@ When modernizing an existing Go codebase:
 
 1. **Bump `go.mod`** to the latest version your team supports. This enables the new semantics.
 2. **Run `go fix ./...`** in 1.26+. Review and commit.
-3. **Run `golangci-lint run` with recent lints enabled** — `copyloopvar`, `intrange`,
+3. **Run `golangci-lint run` with recent lints enabled** `copyloopvar`, `intrange`,
    `modernize`, `loopclosure` will surface remaining old idioms.
 4. **Replace `sync.Once` + package var with `sync.OnceValue`** where applicable.
 5. **Replace custom logging with `slog`.** If you can't do it all at once, do it per-package.

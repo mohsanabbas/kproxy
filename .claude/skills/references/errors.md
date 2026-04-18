@@ -1,7 +1,7 @@
-# Errors in Go — The Complete Treatment
+# Errors in Go The Complete Treatment
 
 Go's error philosophy: **errors are values, not control flow.** You return them, inspect them,
-wrap them, and match them — you don't throw them, and you rarely panic on them. This file
+wrap them, and match them you don't throw them, and you rarely panic on them. This file
 covers every decision point an agent faces when designing error-handling for a Go codebase.
 
 ## Table of contents
@@ -13,8 +13,8 @@ covers every decision point an agent faces when designing error-handling for a G
 5. [`errors.Is` vs `errors.As`](#5-errorsis-vs-errorsas)
 6. [Multiple errors: `errors.Join`](#6-multiple-errors-errorsjoin)
 7. [When to panic (almost never)](#7-when-to-panic-almost-never)
-8. [`recover` — the three legitimate uses](#8-recover--the-three-legitimate-uses)
-9. [Error messages — the style guide](#9-error-messages--the-style-guide)
+8. [`recover` the three legitimate uses](#8-recover--the-three-legitimate-uses)
+9. [Error messages the style guide](#9-error-messages--the-style-guide)
 10. [Design patterns for error-rich APIs](#10-design-patterns-for-error-rich-apis)
 
 ---
@@ -25,7 +25,7 @@ covers every decision point an agent faces when designing error-handling for a G
    last return value. Callers check it immediately or deliberately explain why they don't.
 2. **Add context when an error crosses a layer boundary.** `fmt.Errorf("loadUser %d: %w", id, err)`
    preserves the cause and adds the who/why.
-3. **Match errors by identity, not by string.** `errors.Is(err, ErrNotFound)` — never
+3. **Match errors by identity, not by string.** `errors.Is(err, ErrNotFound)` never
    `err.Error() == "not found"`.
 4. **Don't log AND return.** Pick one. Logging the same error at every layer produces duplicate
    noise. Log at the top-level handler; return everywhere else.
@@ -49,7 +49,7 @@ var (
 ```
 
 **When to use sentinels:** the caller needs to behave differently based on which specific
-error occurred. If the caller just logs and returns, you don't need a sentinel — any error
+error occurred. If the caller just logs and returns, you don't need a sentinel any error
 value will do.
 
 **When NOT to use sentinels:** when the error carries context (a filename, a line number, a
@@ -73,8 +73,7 @@ func loadUser(id int) (*User, error) {
 }
 ```
 
-**One `%w` per `Errorf` call** (the stdlib accepts multiple since Go 1.20, but it's confusing
-— prefer `errors.Join` for that case, section 6).
+**One `%w` per `Errorf` call** (the stdlib accepts multiple since Go 1.20, but it's confusing prefer `errors.Join` for that case, section 6).
 
 **Use `%v` when you want to report but not expose the cause to `errors.Is`.** For example, a
 parser wrapping an internal scanner error where you don't want callers to depend on the
@@ -84,7 +83,7 @@ scanner's identity:
 return fmt.Errorf("parse config: %v", scanErr)  // flattens; cause hidden
 ```
 
-This is rare — usually `%w` is right. But know the distinction.
+This is rare usually `%w` is right. But know the distinction.
 
 ## 4. Custom error types
 
@@ -115,13 +114,13 @@ if errors.As(err, &pe) {
 
 **Receiver convention:** use a pointer receiver for `Error()` unless the error is a tiny value
 type (like `errors.New`'s underlying struct). Pointer receivers mean two separate `*MyError`
-values are distinct even if their fields are equal — usually what you want for errors.
+values are distinct even if their fields are equal usually what you want for errors.
 
 ## 5. `errors.Is` vs `errors.As`
 
-- `errors.Is(err, target)` — "is `err` (or any error it wraps) equal to `target`?" Use for
+- `errors.Is(err, target)` "is `err` (or any error it wraps) equal to `target`?" Use for
   **sentinel matching**.
-- `errors.As(err, &dst)` — "is `err` (or any error it wraps) of the type of `dst`? If so, set
+- `errors.As(err, &dst)` "is `err` (or any error it wraps) of the type of `dst`? If so, set
   `dst` to it." Use for **custom type extraction**.
 
 ```go
@@ -131,7 +130,7 @@ var ne *net.OpError
 if errors.As(err, &ne) { /* now ne is populated, inspect its fields */ }
 ```
 
-Custom `Is` method — define when two distinct values should match:
+Custom `Is` method define when two distinct values should match:
 
 ```go
 type HTTPError struct { Status int }
@@ -158,7 +157,7 @@ func Close() error {
 }
 ```
 
-`errors.Is` and `errors.As` walk joined errors — callers don't need to know whether it's a
+`errors.Is` and `errors.As` walk joined errors callers don't need to know whether it's a
 single or joined error.
 
 Don't abuse this for "here are 3 validation errors, here's the cause, here's a stack trace."
@@ -182,11 +181,11 @@ Legitimate panics:
 - Missing resources at runtime (return error).
 - Rate limit / unauthorized / not found (return error, often a sentinel).
 
-**Library authors especially:** `panic` in a library is a betrayal of the caller's trust —
+**Library authors especially:** `panic` in a library is a betrayal of the caller's trust
 they can't easily guard against every panic without `recover` at every call site. Export an
 error.
 
-## 8. `recover` — the three legitimate uses
+## 8. `recover` the three legitimate uses
 
 1. **Goroutine-boundary safety in long-running servers.** One request panicking shouldn't
    take down the entire server. HTTP middleware and similar frameworks recover at the boundary,
@@ -212,17 +211,17 @@ error.
 
 2. **Internal `panic` as non-local exit in a deeply recursive parser.** Convert the panic back
    to an error at the public API boundary. Used in `encoding/json`, `regexp`, and the stdlib
-   parser itself. Keep it internal — never let the panic escape the package.
+   parser itself. Keep it internal never let the panic escape the package.
 
 3. **Test helpers that expect specific panics.** `assert.Panics`-style helpers.
 
 **That's it.** `recover` is not a general error-handling mechanism. A code base with
 `recover` scattered throughout is usually misusing it.
 
-**`recover` must be called directly in a deferred function** — not from a function called by
+**`recover` must be called directly in a deferred function** not from a function called by
 a deferred function. The stdlib catches some misuse at compile time, but not all.
 
-## 9. Error messages — the style guide
+## 9. Error messages the style guide
 
 - **Lowercase, no trailing punctuation.** `errors.New("user not found")`, not
   `"User not found!"`. Reason: errors are typically wrapped, and `"outer: User not found!"`
@@ -281,7 +280,7 @@ for attempt := 0; attempt < 3; attempt++ {
     if err == nil { return nil }
     var r Retryable
     if !errors.As(err, &r) || !r.Retryable() {
-        return err  // terminal — give up
+        return err  // terminal give up
     }
     time.Sleep(backoff(attempt))
 }

@@ -1,14 +1,14 @@
-# Go Performance — Measurement, Profiling, Optimization
+# Go Performance Measurement, Profiling, Optimization
 
 A condensed performance reference. **The overriding rule: measure first.** Go is fast by
 default; most code doesn't need optimization. When it does, `pprof` and benchmarks tell you
-where — intuition is frequently wrong.
+where intuition is frequently wrong.
 
 ## Table of contents
 
 1. [The measurement hierarchy](#1-the-measurement-hierarchy)
 2. [Benchmarks with `benchstat`](#2-benchmarks-with-benchstat)
-3. [`pprof` — CPU and memory profiling](#3-pprof--cpu-and-memory-profiling)
+3. [`pprof` CPU and memory profiling](#3-pprof--cpu-and-memory-profiling)
 4. [Escape analysis](#4-escape-analysis)
 5. [`sync.Pool` for allocation reduction](#5-syncpool-for-allocation-reduction)
 6. [Struct field alignment](#6-struct-field-alignment)
@@ -22,7 +22,7 @@ where — intuition is frequently wrong.
 
 ## 1. The measurement hierarchy
 
-Optimize in this order — don't skip:
+Optimize in this order don't skip:
 
 1. **Algorithm.** O(n²) is O(n²) no matter how fast the instructions. Most "slow Go" is a
    linear search in a hot loop that should be a map lookup.
@@ -90,7 +90,7 @@ func BenchmarkEncode(b *testing.B) {
 Reveals how your function scales. If `N=1000` is 200× slower than `N=100` instead of 10×,
 you have a hidden quadratic.
 
-## 3. `pprof` — CPU and memory profiling
+## 3. `pprof` CPU and memory profiling
 
 Enable in tests or programs:
 
@@ -135,10 +135,10 @@ go tool pprof cpu.out
 
 **The 3 profiles to start with:**
 
-1. **CPU** — what's spending time. Start here if the program is slow.
-2. **Allocs** — `/debug/pprof/allocs` (total allocations, not just live). Start here if GC
+1. **CPU** what's spending time. Start here if the program is slow.
+2. **Allocs** `/debug/pprof/allocs` (total allocations, not just live). Start here if GC
    shows up in CPU profile.
-3. **Heap** — what's resident right now. Start here if the program uses too much memory.
+3. **Heap** what's resident right now. Start here if the program uses too much memory.
 
 **Don't guess.** Profile first, optimize what the profile says is hot.
 
@@ -184,11 +184,11 @@ defer bufPool.Put(buf)
 Appropriate for objects that are:
 
 - Expensive to allocate (large buffers, complex structs).
-- Short-lived (the pool is cleared each GC cycle — it's not a long-lived cache).
+- Short-lived (the pool is cleared each GC cycle it's not a long-lived cache).
 - Frequently reused in hot loops.
 
 Not appropriate for tiny types or things you rarely allocate. Pooling overhead can exceed
-allocation cost for simple cases — benchmark before committing.
+allocation cost for simple cases benchmark before committing.
 
 ## 6. Struct field alignment
 
@@ -223,7 +223,7 @@ go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignme
 fieldalignment -fix ./...
 ```
 
-**Only matters at scale** — 10 million instances × 8 bytes saved = 80 MB. For a struct you
+**Only matters at scale** 10 million instances × 8 bytes saved = 80 MB. For a struct you
 allocate twice, it's irrelevant.
 
 Also enable via golangci-lint: `govet: enable: [fieldalignment]`.
@@ -297,14 +297,14 @@ var i interface{} = int(42)   // heap allocation to box the 42
 
 In hot loops, this shows up as tens of millions of allocations. Fixes:
 
-- **Use generics** (Go 1.18+) — type parameters don't box:
+- **Use generics** (Go 1.18+) type parameters don't box:
 
   ```go
   func Max[T cmp.Ordered](a, b T) T { if a > b { return a }; return b }
   ```
 
 - **Use concrete types** in struct fields instead of `any`/`interface{}`. This is usually
-  what you want anyway — `any` is the least-informative type in the language.
+  what you want anyway `any` is the least-informative type in the language.
 
 - **For serialization hotpaths**, custom encoders that avoid `fmt` and `encoding/json`
   reflection pay off. `go.uber.org/zap`-style encoders, code-generated marshalers, etc.
@@ -320,7 +320,7 @@ curl -o default.pgo http://localhost:6060/debug/pprof/profile?seconds=60
 # 2. Place default.pgo in the main package.
 mv default.pgo ./cmd/myservice/
 
-# 3. Build — the compiler uses the profile to guide inlining and specialization.
+# 3. Build the compiler uses the profile to guide inlining and specialization.
 go build -pgo=auto ./cmd/myservice
 ```
 
@@ -342,7 +342,7 @@ Go newcomers often reach for these thinking they'll matter. Usually they don't:
 - **"I'll use `unsafe` for speed."** `unsafe` breaks compiler guarantees and can be *slower*
   when it prevents optimizations. Use only for specific, measured wins (e.g. string/byte
   aliasing) and wall it off in a small, reviewable function.
-- **"I'll avoid deferred functions — they're slow."** `defer` has a tiny cost (a few ns per
+- **"I'll avoid deferred functions they're slow."** `defer` has a tiny cost (a few ns per
   call). It's almost never a hot-path concern. Use defer; the clarity is worth it.
 - **"I'll inline everything manually."** The Go compiler inlines aggressively. Your manual
   inlining usually doesn't help and clutters the code.
