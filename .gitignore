@@ -1,0 +1,38 @@
+# --- Build artefacts ---
+bin/
+dist/
+*.exe
+*.test
+*.out
+*.prof
+coverage.txt
+coverage.html
+
+# --- Go ---
+vendor/
+testdata/fuzz/
+
+# --- Logs / scratch from local demos ---
+demo-logs/
+*.log
+
+# --- Editor / OS ---
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*~
+
+# --- Secrets — never commit ---
+*.pem
+*.key
+*.p12
+*.jks
+*.kdbx
+.env
+.env.*
+!.env.example
+
+# --- Local override ---
+*.local.yaml
+*.local.yml
