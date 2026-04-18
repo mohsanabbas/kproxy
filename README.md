@@ -54,24 +54,7 @@ Then point any Kafka client at `127.0.0.1:19094`. See
 - [docs/plan.md](docs/plan.md) — planner internals
 - [SECURITY.md](SECURITY.md) — security posture and reporting
 
-## Layout
 
-```
-cmd/kproxy/        # entry point
-internal/proxy/    # per-conn lifecycle + framed pumps
-internal/kwire/    # Kafka header codec (flexible + non-flexible)
-internal/frame/    # length-prefixed framing
-internal/interceptor/ # request/response dispatch
-internal/planner/  # worker-pool scoring + plan compute
-internal/topology/ # broker id → advertised mapping
-internal/metadata/ # cached cluster view
-internal/subscription/ # per-group membership tracker
-internal/telemetry/    # lag + coord polling
-internal/kclient/  # side-channel mini-client
-internal/obs/      # metrics + admin HTTP
-example/           # franz-go producer/consumer/probe
-docs/              # design and operator docs
-```
 
 ## Development
 
@@ -84,4 +67,4 @@ govulncheck ./...
 
 ## License
 
-Private — not for external distribution. See `LICENSE`.
+Private  not for external distribution. See [LICENSE](LICENSE).
