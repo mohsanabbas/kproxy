@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Local pre-push gate.
+#
+# GitHub Free does not enforce branch protection or rulesets on private
+# repositories, so we enforce the same checks locally before allowing a push.
+#
+# To enable for this clone:
+#   git config core.hooksPath .githooks
+#
+# To bypass once (NOT recommended):
+#   git push --no-verify
+
+set -euo pipefail
+
+remote="${1:-origin}"
+url="${2:-}"
+
+# Only gate pushes that touch the protected branch.
+protected_branch="main"
+
+push_gates_branch=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/"$protected_branch")
+      push_gates_branch=1
+      ;;
+  esac
+done
+
+if [[ "$push_gates_branch" -eq 0 ]]; then
+  exit 0
+fi
+
+echo "[pre-push] running gate for $remote $protected_branch"
+
+GOPATH_BIN="$(go env GOPATH)/bin"
+
+run() {
+  echo "[pre-push] $*"
+  "$@"
+}
+
+run go vet ./...
+run go test -race -count=1 -timeout 120s ./...
+
+if [[ -x "$GOPATH_BIN/gosec" ]]; then
+  run "$GOPATH_BIN/gosec" -quiet -exclude-dir=example -exclude-dir=demo-logs -exclude-dir=bin ./...
+else
+  echo "[pre-push] gosec not installed; skipping (install: go install github.com/securego/gosec/v2/cmd/gosec@latest)"
+fi
+
+if [[ -x "$GOPATH_BIN/govulncheck" ]]; then
+  run "$GOPATH_BIN/govulncheck" ./...
+else
+  echo "[pre-push] govulncheck not installed; skipping (install: go install golang.org/x/vuln/cmd/govulncheck@latest)"
+fi
+
+echo "[pre-push] all gates passed"
