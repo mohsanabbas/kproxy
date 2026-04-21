@@ -29,6 +29,14 @@ type Metrics struct {
 	TrackerDropped       atomic.Int64
 	PlanDurationNanosSum atomic.Int64
 	PlanCount            atomic.Int64
+	// Panics counts goroutines that recovered from a panic. Any non-zero
+	// value should page on-call: it indicates a bug that would have killed
+	// the process were the recover() not in place.
+	Panics atomic.Int64
+	// MetadataRefreshErrors counts background metadata refresh failures. A
+	// rising value paired with a stale TelemetryAgeNS gauge means the
+	// planner is operating on stale topology.
+	MetadataRefreshErrors atomic.Int64
 
 	// Gauges
 	ConnActive      atomic.Int64
@@ -66,6 +74,8 @@ func New(name string, publish bool) *Metrics {
 				"conn_active":               m.ConnActive.Load(),
 				"telemetry_age_nanos":       m.TelemetryAgeNS.Load(),
 				"subscription_len":          m.SubscriptionLen.Load(),
+				"panics":                    m.Panics.Load(),
+				"metadata_refresh_errors":   m.MetadataRefreshErrors.Load(),
 			}
 		}))
 	}
@@ -91,6 +101,8 @@ func (m *Metrics) PromText() []byte {
 	b = appendSimple(b, "kproxy_conn_active", m.ConnActive.Load())
 	b = appendFloat(b, "kproxy_telemetry_age_seconds", float64(m.TelemetryAgeNS.Load())/1e9)
 	b = appendSimple(b, "kproxy_subscription_len", m.SubscriptionLen.Load())
+	b = appendSimple(b, "kproxy_panics_total", m.Panics.Load())
+	b = appendSimple(b, "kproxy_metadata_refresh_errors_total", m.MetadataRefreshErrors.Load())
 	return b
 }
 

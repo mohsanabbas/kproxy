@@ -20,7 +20,7 @@ type Group struct {
 	mu      sync.Mutex
 	closed  bool
 	members map[*member]struct{}
-	empty   chan struct{} // signalled when membership drops to zero
+	empty   chan struct{} // signaled when membership drops to zero
 }
 
 type member struct {
@@ -40,7 +40,7 @@ func (g *Group) Add(cancel context.CancelFunc, conn net.Conn) (release func()) {
 	}
 	if g.closed {
 		g.mu.Unlock()
-		// Group already drained — cancel immediately.
+		// Group already drained - cancel immediately.
 		cancel()
 		return func() {}
 	}

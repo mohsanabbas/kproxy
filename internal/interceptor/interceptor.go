@@ -50,7 +50,9 @@ func New(d Deps) *Interceptor {
 	if d.PlanTimeout <= 0 {
 		d.PlanTimeout = 2 * time.Second
 	}
-	return &Interceptor{deps: d}
+	return &Interceptor{
+		deps: d,
+	}
 }
 
 // OnRequest implements proxy.Interceptor. It dispatches by API key and
@@ -76,7 +78,7 @@ func (i *Interceptor) OnRequest(ctx context.Context, h kwire.RequestHeader, body
 	return nil
 }
 
-// onMetadata captures the request only insofar as we need to know the version
+// onMetadata captures the request only insofar as the version is needed
 // to decode the response. Rewriting happens in the response path.
 func (i *Interceptor) onMetadata(h kwire.RequestHeader) *proxy.Pending {
 	if i.deps.Topology == nil || i.deps.Topology.Len() == 0 {
@@ -136,8 +138,8 @@ func (i *Interceptor) rewriteFindCoordResp(dst, body []byte, p *proxy.Pending) (
 }
 
 // onJoinGroup decodes the request, extracts the member's protocol metadata
-// (ConsumerProtocolSubscription) for the first protocol entry, and stores it
-// in the subscription store. We do NOT rewrite the response.
+// (ConsumerProtocolSubscription) for the first protocol entry and stores it
+// in the subscription store. The response is not rewritten.
 func (i *Interceptor) onJoinGroup(h kwire.RequestHeader, body []byte) *proxy.Pending {
 	if i.deps.Subscription == nil {
 		if i.deps.Metrics != nil {
@@ -151,8 +153,8 @@ func (i *Interceptor) onJoinGroup(h kwire.RequestHeader, body []byte) *proxy.Pen
 		return nil
 	}
 	if len(jg.Protocols) == 0 || jg.MemberID == "" {
-		// First JoinGroup from a member has empty MemberID; the broker
-		// assigns it in the response. We capture on subsequent rebalances.
+		// First JoinGroup from a member has empty MemberID the broker
+		// assigns it in the response. Subsequent rebalances are captured.
 		if i.deps.Metrics != nil {
 			i.deps.Metrics.InterceptsPassthru.Add(1)
 		}
@@ -179,9 +181,9 @@ func (i *Interceptor) onJoinGroup(h kwire.RequestHeader, body []byte) *proxy.Pen
 }
 
 // onSyncGroup intercepts only when this is the leader's SyncGroup (the only
-// member sending non-empty Assignments). We compute a fresh plan and rewrite
-// the request.Assignments before forwarding to the broker, so that members
-// receive our planned assignment in their SyncGroupResponse.
+// member sending non-empty Assignments). A fresh plan is computed and
+// request.Assignments rewritten before forwarding, so each member receives
+// the planned assignment in its SyncGroupResponse.
 func (i *Interceptor) onSyncGroup(ctx context.Context, h kwire.RequestHeader, body []byte) *proxy.Pending {
 	if i.deps.Planner == nil || i.deps.Subscription == nil {
 		if i.deps.Metrics != nil {
@@ -203,7 +205,7 @@ func (i *Interceptor) onSyncGroup(ctx context.Context, h kwire.RequestHeader, bo
 	}
 
 	// Build inputs: members from the leader's assignment list; subscriptions
-	// from our store; partitions from metadata cache; lag from telemetry.
+	// from the local store; partitions from the metadata cache; lag from telemetry.
 	members := make([]plan.Member, 0, len(sg.Assignments))
 	for _, a := range sg.Assignments {
 		sub := i.deps.Subscription.Get(sg.Group, a.MemberID)
@@ -247,7 +249,7 @@ func (i *Interceptor) onSyncGroup(ctx context.Context, h kwire.RequestHeader, bo
 		}
 	}
 	if len(parts) == 0 {
-		// No partition info — fall back to passthrough rather than emit a
+		// No partition info - fall back to passthrough rather than emit a
 		// degenerate plan that gives every consumer nothing.
 		if i.deps.Metrics != nil {
 			i.deps.Metrics.InterceptsPassthru.Add(1)
@@ -274,7 +276,7 @@ func (i *Interceptor) onSyncGroup(ctx context.Context, h kwire.RequestHeader, bo
 	}
 
 	// Rewrite the leader's Assignments[]: replace each member's blob with
-	// our planned per-member assignment, then re-encode the SyncGroupRequest
+	// the planned per-member assignment, then re-encode the SyncGroupRequest
 	// body and hand it to proxy.Conn via Pending.RewriteRequest. The broker
 	// will fan these out to followers, so every member receives the planned
 	// assignment in their own SyncGroupResponse.

@@ -26,7 +26,7 @@ func encodeMetadataReqV9(topics []string, allowAutoCreate bool) []byte {
 	if topics == nil {
 		dst = kwire.AppendUvarint(dst, 0) // null
 	} else {
-		// Topic count is supplied by kproxy itself (cache refresh path); it is
+		// Topic count is supplied by kproxy itself (cache refresh path) it is
 		// bounded by the cluster size, never near uint32 limits.
 		dst = kwire.AppendUvarint(dst, uint32(len(topics)+1)) // #nosec G115 -- bounded by cluster topic count
 		for _, t := range topics {
@@ -39,8 +39,10 @@ func encodeMetadataReqV9(topics []string, allowAutoCreate bool) []byte {
 	} else {
 		dst = append(dst, 0)
 	}
-	dst = append(dst, 0) // includeClusterAuthorizedOperations
-	dst = append(dst, 0) // includeTopicAuthorizedOperations
+	dst = append(dst,
+		0, // includeClusterAuthorizedOperations
+		0, // includeTopicAuthorizedOperations
+	)
 	dst = kwire.AppendEmptyTaggedFields(dst)
 	return dst
 }

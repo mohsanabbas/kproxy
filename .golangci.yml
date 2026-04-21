@@ -1,0 +1,195 @@
+# golangci-lint v2 configuration for kproxy.
+# Targets: Go 1.26+, std-lib-only proxy, strict CSP discipline.
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    # Correctness
+    - errcheck         # unchecked errors
+    - govet            # shadow, unsafeptr, lostcancel, copylocks, etc.
+    - staticcheck      # bug catcher + style + simplifications
+    - ineffassign      # ineffective assignments
+    - unused           # dead code
+    - gocritic         # opinionated checks
+    - bodyclose        # http.Response.Body.Close()
+    - rowserrcheck     # database/sql Rows.Err()
+    - sqlclosecheck    # database/sql Stmt/Rows close
+    - nilerr           # returning nil after non-nil err check
+    - errorlint        # %w wrapping, errors.Is/As discipline
+    - copyloopvar      # Go 1.22+ loop var capture (should never trigger on 1.26)
+    - intrange         # prefer for i := range N
+    - durationcheck    # multiplying durations
+    - asasalint        # passing []any to variadic any
+    - asciicheck       # non-ASCII identifiers
+    - bidichk          # unicode bidi attacks
+    - gocheckcompilerdirectives # //go:foo typos
+
+    # Concurrency / proxy hot path
+    - contextcheck     # context propagation
+    - noctx            # http calls without context
+    - makezero         # make([]T, n) then append (silently grows)
+    - prealloc         # slice prealloc opportunities
+
+    # Security
+    - gosec
+
+    # Performance
+    - perfsprint       # fmt.Sprintf -> strconv where cheaper
+    - fatcontext       # context inside loops
+
+    # Style
+    - unconvert        # redundant conversions
+    - misspell         # English typos
+    - nolintlint       # //nolint hygiene
+    - revive           # configurable replacement for golint
+    - whitespace
+    - usestdlibvars    # use http.MethodGet etc.
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+      exclude-functions:
+        - (net.Conn).Close
+        - (net.Listener).Close
+        - (io.Closer).Close
+        - fmt.Fprintf
+        - fmt.Fprint
+        - fmt.Fprintln
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment   # noisy; run manually with -fix when needed
+        - shadow           # too noisy on err shadowing
+
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+        - hugeParam        # passed structs are deliberate in places
+        - rangeValCopy
+        - paramTypeCombine
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+
+    gosec:
+      excludes:
+        - G104   # errcheck overlaps; handled by errcheck
+        - G115   # int conversion overflow; covered by review for kwire codecs
+
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+          arguments: ["disableStutteringCheck"]
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unreachable-code
+        - name: unused-parameter
+          disabled: true   # too noisy on interface implementations
+        - name: var-declaration
+        - name: var-naming
+
+    staticcheck:
+      checks:
+        - all
+        - "-ST1000"  # missing package doc (only main packages)
+        - "-ST1003"  # initialism rules conflict with Kafka APIName style
+        - "-QF1008"  # remove embedded field selector (cosmetic)
+
+    perfsprint:
+      int-conversion: true
+      err-error: true
+      errorf: false       # %w wrapping is mandatory in this repo
+      sprintf1: true
+      strconcat: false
+
+    misspell:
+      locale: US
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+
+  exclusions:
+    generated: lax
+    presets:
+      - common-false-positives
+      - std-error-handling
+    rules:
+      # Test files: relax some checks.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+          - perfsprint
+          - prealloc
+          - revive
+          - gocritic
+      # cmd/main: allow os.Exit, log.Fatal patterns.
+      - path: cmd/
+        linters:
+          - revive
+        text: "exported"
+      # Wire codecs: protocol types are named after the Kafka spec doc
+      # comments would just restate the name.
+      - path: internal/kwire/
+        linters:
+          - revive
+        text: "(var-naming|exported)"
+      # Admin server intentionally builds a fresh context for graceful shutdown.
+      - path: internal/obs/admin.go
+        linters:
+          - contextcheck
+      # Test helper using fmt.Errorf for compile-time wrap check.
+      - path: internal/kwire/primitives_test.go
+        linters:
+          - staticcheck
+        text: "ST1012"
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+      - example/
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/mohsanabbas/kproxy
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+      - example/
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

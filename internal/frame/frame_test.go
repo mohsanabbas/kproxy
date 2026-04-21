@@ -88,7 +88,7 @@ func BenchmarkRoundTripZeroAlloc(b *testing.B) {
 	defer Release(buf)
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		r.r = bytes.NewReader(frame)
 		if _, err := r.ReadFrame(buf); err != nil {
 			b.Fatal(err)

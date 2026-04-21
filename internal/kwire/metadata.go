@@ -74,7 +74,7 @@ func DecodeMetadataResponse(body []byte, version int16) (MetadataResponse, error
 	}
 	if n > 0 {
 		r.Brokers = make([]MetadataBroker, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			b, err := decodeMetadataBroker(&c, version, flex)
 			if err != nil {
 				return r, err
@@ -110,7 +110,7 @@ func DecodeMetadataResponse(body []byte, version int16) (MetadataResponse, error
 	}
 	if n > 0 {
 		r.Topics = make([]MetadataTopic, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			t, err := decodeMetadataTopic(&c, version, flex)
 			if err != nil {
 				return r, err

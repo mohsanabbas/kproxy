@@ -12,9 +12,7 @@ import (
 	"github.com/mohsanabbas/kproxy/internal/kwire"
 )
 
-// GroupRegistry yields the set of consumer-group ids the poller should
-// describe. In production this is backed by the subscription store, which
-// learns about groups from JoinGroup intercepts. Tests inject a static set.
+// GroupRegistry yields the set of consumer-group ids the poller should describe.
 type GroupRegistry interface {
 	Groups() []string
 }
@@ -23,18 +21,10 @@ type GroupRegistry interface {
 type StaticGroups []string
 
 // Groups implements GroupRegistry.
-func (s StaticGroups) Groups() []string { return ([]string)(s) }
+func (s StaticGroups) Groups() []string { return []string(s) }
 
-// Coordinator routes RPCs for a given group/topic. The poller calls these on
-// every tick. In production a single kclient.Conn per broker suffices; the
-// caller is responsible for opening conns to the right broker (group
-// coordinator for OffsetFetch/DescribeGroups, partition leader for
-// ListOffsets).
-//
-// For v1 we use a single *kclient.Conn for everything (the bootstrap broker
-// will forward as needed; performance is not the goal — telemetry is a
-// background job). We keep the interface narrow so a multi-broker pool can
-// drop in later without touching the poller.
+// Coordinator routes the RPCs issued by Poller. A single *kclient.Conn
+// satisfies this interface; a multi-broker pool may replace it later.
 type Coordinator interface {
 	DescribeGroups(req kwire.DescribeGroupsRequest) (kwire.DescribeGroupsResponse, error)
 	OffsetFetch(req kwire.OffsetFetchRequest) (kwire.OffsetFetchResponse, error)
@@ -44,33 +34,21 @@ type Coordinator interface {
 // Static check: a real *kclient.Conn satisfies Coordinator.
 var _ Coordinator = (*kclient.Conn)(nil)
 
-// Poller refreshes a Holder by polling Kafka at a fixed interval.
-//
-// Each tick:
-//  1. r.Groups() → list of group ids of interest.
-//  2. DescribeGroups for that set → per-member assignment blobs (parsed to
-//     learn each member's owned (topic, partition) set).
-//  3. OffsetFetch for each group's owned (topic, partition) set → committed.
-//  4. ListOffsets latest for the union of (topic, partition) → HWM.
-//  5. Compute lag per (group, member) = sum(HWM - committed) over owned parts.
-//  6. Atomically Store the new Snapshot.
-//
-// Errors at any step poison only that group's slice of the snapshot —
-// surviving groups are still published. The previous snapshot stays visible
-// while the next tick is in flight.
+// Poller refreshes a Holder by polling Kafka at a fixed interval. Each tick
+// issues DescribeGroups, ListOffsets and OffsetFetch, derives per-member
+// lag and atomically stores a fresh Snapshot. Per-group errors do not
+// evict surviving groups.
 type Poller struct {
 	Coord    Coordinator
 	Registry GroupRegistry
 	Holder   *Holder
 	Interval time.Duration
 
-	// OnError is called for every per-group failure with the group id and the
-	// error. Optional; nil disables logging. The poller never blocks on this.
+	// OnError receives per-group failures. nil disables reporting.
 	OnError func(group string, err error)
 }
 
-// Run blocks driving polls until ctx is cancelled. The first poll happens
-// immediately so callers don't have to wait one Interval for warm-up.
+// Run drives polls until ctx is canceled. The first poll fires immediately.
 func (p *Poller) Run(ctx context.Context) {
 	if p.Interval <= 0 {
 		p.Interval = 15 * time.Second
@@ -106,7 +84,7 @@ func (p *Poller) tick(ctx context.Context) {
 		return
 	}
 
-	// 1. DescribeGroups gives us per-member assignment blobs.
+	// 1. DescribeGroups returns per-member assignment blobs.
 	dg, err := p.Coord.DescribeGroups(kwire.DescribeGroupsRequest{Groups: groups})
 	if err != nil {
 		p.reportAll(groups, err)
@@ -140,7 +118,7 @@ func (p *Poller) tick(ctx context.Context) {
 				p.report(g.GroupID, err)
 				continue
 			}
-			// Copy strings out of the assignment blob — DescribeGroups
+			// Copy strings out of the assignment blob - DescribeGroups
 			// response buffer is reused by the kclient on the next RPC.
 			cp := make([]kwire.TopicPartitions, 0, len(a.Partitions))
 			for _, tp := range a.Partitions {
@@ -297,8 +275,7 @@ func (p *Poller) reportAll(groups []string, err error) {
 	}
 }
 
-// kafkaErr wraps a non-zero Kafka error code with context. We don't pull in a
-// full error-code table for v1; the numeric code is enough for ops.
+// kafkaErr wraps a non-zero Kafka error code with op context.
 func kafkaErr(op string, code int16) error {
 	return &kErr{op: op, code: code}
 }
@@ -315,9 +292,7 @@ func (e *kErr) Error() string {
 // Compile-time guard: a Holder satisfies Source.
 var _ Source = (*Holder)(nil)
 
-// SyncRegistry is a tiny mutex-protected GroupRegistry useful for the
-// subscription store wiring (and for the poller's tests). We keep it here so
-// telemetry has no dependency on the (yet-unbuilt) subscription package.
+// SyncRegistry is a mutex-protected GroupRegistry.
 type SyncRegistry struct {
 	mu     sync.Mutex
 	groups map[string]struct{}
@@ -342,8 +317,7 @@ func (r *SyncRegistry) Remove(group string) {
 	r.mu.Unlock()
 }
 
-// Groups implements GroupRegistry. The returned slice is a fresh copy and is
-// owned by the caller.
+// Groups implements GroupRegistry. The returned slice is owned by the caller.
 func (r *SyncRegistry) Groups() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()

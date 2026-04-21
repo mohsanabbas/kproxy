@@ -1,7 +1,7 @@
 package kwire
 
-// DescribeGroups v5 codec — kproxy is the client. v5 is the first flexible
-// version and is sufficient for telemetry: we read group state, members, and
+// DescribeGroups v5 codec - kproxy is the client. v5 is the first flexible
+// version and is sufficient for telemetry: group state, members and
 // member metadata/assignment blobs.
 
 const DescribeGroupsVersion int16 = 5

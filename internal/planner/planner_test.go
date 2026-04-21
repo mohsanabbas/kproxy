@@ -49,7 +49,7 @@ func TestPlanContextCancelled(t *testing.T) {
 	time.Sleep(5 * time.Millisecond)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // already cancelled
+	cancel() // already canceled
 	_, _, err := p.Plan(ctx, plan.Inputs{
 		Members:    []plan.Member{{MemberID: "m1", Topics: []string{"t"}}},
 		Partitions: map[string][]int32{"t": {0}},

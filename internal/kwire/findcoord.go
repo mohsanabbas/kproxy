@@ -12,7 +12,7 @@ package kwire
 //	v5+:   no field changes (added new error code)
 //	v6+:   no field changes (share-groups support)
 //
-// We keep both shapes in one struct: the v0..3 fields are populated when
+// Both shapes share one struct: the v0..3 fields are populated when
 // Version <= 3, and Coordinators is populated when Version >= 4.
 type FindCoordinatorResponse struct {
 	Version        int16

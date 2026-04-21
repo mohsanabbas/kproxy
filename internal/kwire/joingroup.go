@@ -96,7 +96,7 @@ func DecodeJoinGroupRequest(body []byte, version int16) (JoinGroupRequest, error
 	}
 	if n > 0 {
 		r.Protocols = make([]JoinGroupProtocol, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			var p JoinGroupProtocol
 			if flex {
 				p.Name, err = c.ReadCompactString()
@@ -143,7 +143,7 @@ func DecodeJoinGroupRequest(body []byte, version int16) (JoinGroupRequest, error
 	return r, nil
 }
 
-// AppendJoinGroupRequest serialises a JoinGroup request body.
+// AppendJoinGroupRequest serializes a JoinGroup request body.
 func AppendJoinGroupRequest(dst []byte, r JoinGroupRequest) []byte {
 	flex := IsFlexibleRequest(APIJoinGroup, r.Version)
 	if flex {

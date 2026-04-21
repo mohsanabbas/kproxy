@@ -2,7 +2,8 @@ package kwire
 
 // RequestHeader is the decoded prefix of a Kafka request frame. ClientID is
 // borrowed from the input buffer when present (it's a Go string allocation,
-// since we need to forward it across frame lifetimes if the body is rewritten).
+// since the header is forwarded across frame lifetimes when the body is
+// rewritten).
 type RequestHeader struct {
 	APIKey     int16
 	APIVersion int16
@@ -63,7 +64,7 @@ func DecodeRequestHeader(body []byte) (RequestHeader, error) {
 
 // AppendRequestHeader writes a request header onto dst. It always emits the
 // flexible (v2) form when the (apiKey,apiVersion) pair calls for it, otherwise
-// the v1 form. We never emit v0.
+// the v1 form. v0 is never emitted.
 func AppendRequestHeader(dst []byte, h RequestHeader) []byte {
 	dst = AppendInt16(dst, h.APIKey)
 	dst = AppendInt16(dst, h.APIVersion)
@@ -85,7 +86,7 @@ type ResponseHeader struct {
 }
 
 // DecodeResponseHeader parses a response frame header. The caller MUST already
-// know the (apiKey,version) so that we can pick the right header version —
+// know the (apiKey, version) to select the right header version -
 // responses don't carry that information themselves; routing comes from the
 // correlation id.
 func DecodeResponseHeader(body []byte, apiKey, apiVersion int16) (ResponseHeader, error) {

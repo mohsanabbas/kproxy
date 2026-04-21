@@ -1,6 +1,6 @@
 package kwire
 
-// OffsetFetch v8 codec — kproxy is the client. We pin to v8 to take advantage
+// OffsetFetch v8 codec - kproxy is the client. v8 is pinned to take advantage
 // of the multi-group form (one RPC instead of N for telemetry).
 
 const OffsetFetchVersion int16 = 8

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"errors"
 	"io"
 	"net"
 	"sync/atomic"
@@ -12,7 +13,7 @@ import (
 
 // BenchmarkPassthrough measures the per-frame allocation cost of the proxy
 // hot path with the NoopInterceptor (i.e. the byte-for-byte forwarder). The
-// goal is to keep the steady-state allocs/op as low as possible — the frame
+// goal is to keep the steady-state allocs/op as low as possible - the frame
 // pool and pre-grown rewrite buffers should make the loop allocation-free
 // after warm-up.
 //
@@ -68,12 +69,12 @@ func BenchmarkPassthrough(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		if err := cw.WriteFrame(req); err != nil {
 			b.Fatalf("write: %v", err)
 		}
 		if _, err := cr.ReadFrame(clientBuf); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return
 			}
 			b.Fatalf("read: %v", err)

@@ -108,7 +108,7 @@ func DecodeSyncGroupRequest(body []byte, version int16) (SyncGroupRequest, error
 	}
 	if n > 0 {
 		r.Assignments = make([]SyncGroupAssignment, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			var a SyncGroupAssignment
 			if flex {
 				a.MemberID, err = c.ReadCompactString()
@@ -142,7 +142,7 @@ func DecodeSyncGroupRequest(body []byte, version int16) (SyncGroupRequest, error
 	return r, nil
 }
 
-// AppendSyncGroupRequest serialises a SyncGroup request body using its Version.
+// AppendSyncGroupRequest serializes a SyncGroup request body using its Version.
 func AppendSyncGroupRequest(dst []byte, r SyncGroupRequest) []byte {
 	flex := IsFlexibleRequest(APISyncGroup, r.Version)
 
@@ -265,7 +265,7 @@ func DecodeSyncGroupResponse(body []byte, version int16) (SyncGroupResponse, err
 	return r, nil
 }
 
-// AppendSyncGroupResponse serialises a SyncGroup response body.
+// AppendSyncGroupResponse serializes a SyncGroup response body.
 func AppendSyncGroupResponse(dst []byte, r SyncGroupResponse) []byte {
 	flex := IsFlexibleResponse(APISyncGroup, r.Version)
 	if r.Version >= 1 {

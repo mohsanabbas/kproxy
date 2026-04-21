@@ -29,11 +29,11 @@ import (
 
 func main() {
 	var (
-		brokers   = flag.String("brokers", "localhost:19094", "comma-separated bootstrap servers (point at kproxy)")
-		topic     = flag.String("topic", "event-tracking_track-events-approved", "topic to produce to")
-		rate      = flag.Int("rate", 100, "approx messages/sec")
-		clientID  = flag.String("client-id", "demo-producer", "Kafka client.id")
-		keySpace  = flag.Int("keys", 1000, "number of distinct keys (controls partition spread)")
+		brokers  = flag.String("brokers", "localhost:19094", "comma-separated bootstrap servers (point at kproxy)")
+		topic    = flag.String("topic", "event-tracking_track-events-approved", "topic to produce to")
+		rate     = flag.Int("rate", 100, "approx messages/sec")
+		clientID = flag.String("client-id", "demo-producer", "Kafka client.id")
+		keySpace = flag.Int("keys", 1000, "number of distinct keys (controls partition spread)")
 	)
 	flag.Parse()
 

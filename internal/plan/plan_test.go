@@ -34,7 +34,7 @@ func TestComputeAllPartitionsAssignedExactlyOnce(t *testing.T) {
 
 func TestComputeFeasibility(t *testing.T) {
 	t.Parallel()
-	// 3 members, 3 partitions — every member must own one.
+	// 3 members, 3 partitions - every member must own one.
 	in := Inputs{
 		Members: []Member{
 			{MemberID: "m1", Topics: []string{"t"}},

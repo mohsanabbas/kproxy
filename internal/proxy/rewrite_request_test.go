@@ -41,7 +41,7 @@ func TestPending_RewriteRequest_ReplacesUpstreamPayload(t *testing.T) {
 		t.Fatalf("client write: %v", err)
 	}
 
-	// Broker reads — should see header preserved, payload replaced.
+	// Broker reads - should see header preserved, payload replaced.
 	br := frame.NewReader(brokerApp, frame.MaxFrameSize)
 	buf := frame.Get()
 	defer frame.Release(buf)

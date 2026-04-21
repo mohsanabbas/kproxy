@@ -3,7 +3,7 @@ package kwire
 import "testing"
 
 // These fuzz targets ensure decoders never panic on adversarial input. We
-// don't assert on round-trip equivalence here — that's covered by the unit
+// don't assert on round-trip equivalence here - that's covered by the unit
 // tests with hand-crafted golden frames. The fuzzer's job is purely
 // crash-resistance.
 

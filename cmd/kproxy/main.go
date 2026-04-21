@@ -60,6 +60,8 @@ type config struct {
 	plannerQueue  int
 	subMax        int
 	clientID      string
+	enablePprof   bool
+	healthMaxAge  time.Duration
 }
 
 func run() error {
@@ -82,6 +84,8 @@ func run() error {
 	flag.IntVar(&cfg.plannerQueue, "planner-queue", 0, "planner queue depth (0 = workers*4)")
 	flag.IntVar(&cfg.subMax, "subscription-cap", 100_000, "max tracked subscriptions across all groups")
 	flag.StringVar(&cfg.clientID, "client-id", "kproxy", "client.id presented to the broker by side-channel kclient calls")
+	flag.BoolVar(&cfg.enablePprof, "enable-pprof", false, "expose /debug/pprof on admin (off by default - heap profiles leak in-flight Kafka frame plaintext)")
+	flag.DurationVar(&cfg.healthMaxAge, "health-max-metadata-age", 0, "/healthz returns 503 when metadata snapshot is older than this (0 = 3*refresh)")
 	flag.Parse()
 
 	if cfg.broker == "" {
@@ -126,6 +130,10 @@ func run() error {
 
 	// Metadata cache
 	metaCache := metadata.NewCache(metadata.KClientSource{Conn: side}, cfg.refresh)
+	metaCache.OnError = func(err error) {
+		metrics.MetadataRefreshErrors.Add(1)
+		logger.Warn("metadata refresh failed", "err", err)
+	}
 
 	// Subscription store + telemetry registry
 	subStore := subscription.NewStore(cfg.subMax)
@@ -158,8 +166,13 @@ func run() error {
 		Metrics:      metrics,
 	})
 
+	// Root context for listeners and pumps.
+	rootCtx, rootCancel := context.WithCancel(context.Background())
+	defer rootCancel()
+
 	// Listener
-	ln, err := net.Listen("tcp", cfg.listen)
+	lc := net.ListenConfig{}
+	ln, err := lc.Listen(rootCtx, "tcp", cfg.listen)
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
@@ -193,13 +206,18 @@ func run() error {
 	}
 
 	// Run everything
-	rootCtx, rootCancel := context.WithCancel(context.Background())
-	defer rootCancel()
-
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	eg, egCtx := errgroup.WithContext(rootCtx)
+
+	// Prime the metadata cache before starting the periodic refresher so
+	// /healthz reports ready immediately and the first JoinGroup does not
+	// race the initial Refresh tick. Failure here is non-fatal: log it and
+	// let the background refresher retry.
+	if _, err := metaCache.Refresh(rootCtx); err != nil {
+		logger.Warn("initial metadata refresh failed", "err", err)
+	}
 
 	eg.Go(func() error { metaCache.Run(egCtx); return nil })
 	eg.Go(func() error { poller.Run(egCtx); return nil })
@@ -207,7 +225,15 @@ func run() error {
 		if cfg.admin == "" {
 			return nil
 		}
-		admin := &obs.Admin{Addr: cfg.admin, Metrics: metrics}
+		admin := &obs.Admin{
+			Addr:        cfg.admin,
+			Metrics:     metrics,
+			EnablePprof: cfg.enablePprof,
+			Health: healthCheck{
+				cache:  metaCache,
+				maxAge: healthMaxAge(cfg),
+			},
+		}
 		return admin.Run(egCtx)
 	})
 
@@ -251,7 +277,26 @@ func run() error {
 	return nil
 }
 
-// gaugeRefresher updates time-derived gauges periodically. We do this in a
+// healthCheck adapts metadata.Cache to obs.HealthChecker. /healthz returns
+// 503 when the published snapshot is older than maxAge, signaling k8s/LB to
+// pull this pod out of rotation rather than serving stale topology.
+type healthCheck struct {
+	cache  *metadata.Cache
+	maxAge time.Duration
+}
+
+func (h healthCheck) MetadataAgeOK() bool { return h.cache.Age() <= h.maxAge }
+
+// healthMaxAge resolves the /healthz freshness budget. Default to 3x the
+// refresh interval so a single missed refresh does not flap the LB.
+func healthMaxAge(cfg config) time.Duration {
+	if cfg.healthMaxAge > 0 {
+		return cfg.healthMaxAge
+	}
+	return 3 * cfg.refresh
+}
+
+// gaugeRefresher updates time-derived gauges periodically. Keeping it in a
 // dedicated goroutine because the snapshot pointers are atomic and the cost
 // is trivial.
 func gaugeRefresher(ctx context.Context, m *obs.Metrics, h *telemetry.Holder, s *subscription.Store) {

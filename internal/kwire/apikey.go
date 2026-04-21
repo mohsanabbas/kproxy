@@ -1,6 +1,6 @@
 package kwire
 
-// API key constants for the requests we either intercept, rewrite, or use for
+// API key constants for the requests kproxy either intercepts, rewrites, or uses for
 // telemetry collection. Other API keys flow through unchanged and are not
 // listed here.
 const (
@@ -26,8 +26,8 @@ const (
 // uses the flexible (KIP-482) header. A value of -1 means the API never uses
 // flexible headers.
 //
-// This table only needs entries for keys we actually parse on the proxy; for
-// every other API key we route opaquely so we don't care which header version
+// This table only needs entries for keys parsed on the proxy; for
+// every other API key kproxy routes opaquely and does not care which header version
 // it uses.
 //
 // Refresh policy: when adding a new API key here, look it up in the Apache
@@ -73,12 +73,12 @@ var flexAtResponse = map[int16]int16{
 }
 
 // IsFlexibleRequest reports whether (apiKey,version) uses a flexible request
-// header (header v2). Unknown keys default to non-flexible (header v1) so that
-// passing through an unknown frame never causes us to mis-skip bytes — we just
-// never decode the header in the first place.
+// header (header v2). Unknown keys default to non-flexible (header v1) so
+// that an unknown frame passed through never causes mis-skipped bytes - the
+// proxy does not decode the header for unknown keys.
 func IsFlexibleRequest(apiKey, version int16) bool {
-	if min, ok := flexAtRequest[apiKey]; ok && min >= 0 {
-		return version >= min
+	if minVer, ok := flexAtRequest[apiKey]; ok && minVer >= 0 {
+		return version >= minVer
 	}
 	return false
 }
@@ -86,8 +86,8 @@ func IsFlexibleRequest(apiKey, version int16) bool {
 // IsFlexibleResponse reports whether (apiKey,version) uses a flexible response
 // header.
 func IsFlexibleResponse(apiKey, version int16) bool {
-	if min, ok := flexAtResponse[apiKey]; ok && min >= 0 {
-		return version >= min
+	if minVer, ok := flexAtResponse[apiKey]; ok && minVer >= 0 {
+		return version >= minVer
 	}
 	return false
 }

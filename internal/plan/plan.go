@@ -1,6 +1,6 @@
 // Package plan computes a per-group consumer assignment: which member owns
 // which (topic, partition). All inputs are taken by value (or as read-only
-// pointers); planning is a pure function suitable for the bounded worker pool
+// pointers) planning is a pure function suitable for the bounded worker pool
 // in package planner.
 //
 // The algorithm is capacity-weighted sticky:
@@ -35,8 +35,8 @@ type Member struct {
 type Inputs struct {
 	GroupID    string
 	Members    []Member
-	Partitions map[string][]int32 // topic → partition ids; from metadata cache
-	Previous   Plan               // last known assignment for stickiness; may be nil
+	Partitions map[string][]int32 // topic, partition ids from metadata cache
+	Previous   Plan               // last known assignment for stickiness may be nil
 }
 
 // Plan maps memberID → topic → []partition. Values are owned by the Plan and
@@ -71,7 +71,6 @@ func Compute(in Inputs) Plan {
 	}
 	sort.Strings(memberIDs)
 
-	// Topic → set of subscribed member ids (for fast lookup).
 	subscribers := make(map[string]map[string]struct{})
 	for _, mid := range memberIDs {
 		for _, t := range memberByID[mid].Topics {
@@ -84,7 +83,7 @@ func Compute(in Inputs) Plan {
 		}
 	}
 
-	// Step 1: stickiness — keep what we can from the previous plan.
+	// stickiness keep what is still valid from the previous plan.
 	free := freePool{} // (topic, part) pairs to distribute
 	for topic, parts := range in.Partitions {
 		for _, p := range parts {
@@ -110,8 +109,8 @@ func Compute(in Inputs) Plan {
 		}
 	}
 
-	// Step 2: capacity-weighted distribution. We use integer weights:
-	//   weight = max(1, scale - min(scale-1, lag/lagDivisor))
+	// Capacity-weighted distribution. Integer weights:
+	// weight = max(1, scale - min(scale-1, lag/lagDivisor))
 	// so members with lag=0 get the highest weight, and weights stay bounded.
 	const (
 		scale      = 100
@@ -131,10 +130,10 @@ func Compute(in Inputs) Plan {
 		weight[mid] = w
 	}
 
-	// Distribute the free pool. We iterate the free pool in deterministic
+	// Distribute the free pool. The free pool is iterated in deterministic
 	// (topic, partition) order. For each partition, pick the eligible member
 	// (subscribed to the topic) with the highest remaining weight quota.
-	// Quota is updated by deducting 1 per assigned partition; on tie we pick
+	// Quota is updated by deducting 1 per assigned partition; ties are broken
 	// the member with the lowest current load, then the lowest id.
 	load := make(map[string]int, len(memberIDs))
 	for mid, parts := range out {
@@ -155,7 +154,7 @@ func Compute(in Inputs) Plan {
 				continue
 			}
 			// Score = weight - (load * scaleAdjust). Higher = better candidate.
-			// We bias toward low-load members to spread evenly when weights
+			// Bias toward low-load members to spread evenly when weights
 			// are equal.
 			score := weight[mid]*8 - load[mid]
 			if bestID == "" || score > bestScore || (score == bestScore && load[mid] < bestLoad) {
@@ -170,9 +169,9 @@ func Compute(in Inputs) Plan {
 		}
 	})
 
-	// Step 3: feasibility — every subscribed member should own ≥1 partition
+	// feasibility, every subscribed member should own ≥1 partition
 	// when partitions ≥ members for at least one of their subscribed topics.
-	// We steal from the most-loaded eligible member to a starved one.
+	// Steal from the most-loaded eligible member to a starved one.
 	for _, mid := range memberIDs {
 		if hasAny(out[mid]) {
 			continue
@@ -266,7 +265,7 @@ func hasAny(byTopic map[string][]int32) bool {
 }
 
 // freePool is an ordered set of (topic, partition) pairs supporting O(1)
-// remove. We keep insertion order for determinism: Compute iterates topics
+// remove. Insertion order is kept for determinism: Compute iterates topics
 // and partitions in sorted order before adding to the pool.
 type freePool struct {
 	keys  []freeKey       // ordered; nil entries mean removed

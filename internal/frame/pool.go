@@ -2,7 +2,7 @@ package frame
 
 import "sync"
 
-// Buffer is a length-prefixed Kafka frame's payload — the bytes after the
+// Buffer is a length-prefixed Kafka frame's payload - the bytes after the
 // 4-byte length prefix. Buffers are pooled to avoid allocation on every frame.
 //
 // A Buffer is owned by exactly one goroutine at a time. Calling Release while
@@ -28,12 +28,12 @@ func (b *Buffer) grow(n int) {
 		b.b = b.b[:n]
 		return
 	}
-	// Allocate a new backing slice. We deliberately do NOT round up here — the
+	// Allocate a new backing slice. Size is not rounded up - the
 	// caller already knows the exact frame length.
 	b.b = make([]byte, n)
 }
 
-// pool tiers — buffers larger than maxCap are dropped on Release rather than
+// pool tiers - buffers larger than maxCap are dropped on Release rather than
 // returned to the pool, to bound steady-state memory.
 const maxCap = 1 << 20 // 1 MiB; frames bigger than this are usually one-off Produce/Fetch
 
@@ -44,7 +44,7 @@ var pool = sync.Pool{
 // Get returns a Buffer with its slice truncated to zero length. The caller
 // must call Release exactly once when done.
 func Get() *Buffer {
-	b := pool.Get().(*Buffer)
+	b, _ := pool.Get().(*Buffer)
 	b.b = b.b[:0]
 	return b
 }

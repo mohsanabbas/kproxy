@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -38,9 +39,9 @@ type Listener struct {
 }
 
 // Serve blocks accepting connections until the listener is closed or ctx is
-// cancelled. Each accepted client gets its own goroutine running a *Conn.
+// canceled. Each accepted client gets its own goroutine running a *Conn.
 //
-// Serve does NOT close Listen on return — the caller owns it (so it can be
+// Serve does NOT close Listen on return - the caller owns it (so it can be
 // closed first to unblock Accept and then Drain pending conns).
 func (l *Listener) Serve(ctx context.Context) error {
 	var sem chan struct{}
@@ -50,13 +51,34 @@ func (l *Listener) Serve(ctx context.Context) error {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
+	// Exponential backoff for transient Accept errors (EMFILE / ENFILE).
+	// Without it a process-wide fd exhaustion would spin Accept at 100% CPU
+	// returning the same error tens of thousands of times per second.
+	var acceptDelay time.Duration
 	for {
 		client, err := l.Listen.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				return nil
 			}
-			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+			var ne net.Error
+			if errors.As(err, &ne) {
+				if acceptDelay == 0 {
+					acceptDelay = 5 * time.Millisecond
+				} else {
+					acceptDelay *= 2
+				}
+				if acceptDelay > time.Second {
+					acceptDelay = time.Second
+				}
+				if l.OnAcceptError != nil {
+					l.OnAcceptError(err)
+				}
+				select {
+				case <-time.After(acceptDelay):
+				case <-ctx.Done():
+					return nil
+				}
 				continue
 			}
 			if l.OnAcceptError != nil {
@@ -64,7 +86,8 @@ func (l *Listener) Serve(ctx context.Context) error {
 			}
 			return err
 		}
-		// Apply semaphore before dial so we don't burn broker conns when
+		acceptDelay = 0
+		// Apply semaphore before dial so broker conns are not burned when
 		// over capacity.
 		if sem != nil {
 			select {
@@ -91,6 +114,15 @@ func (l *Listener) Serve(ctx context.Context) error {
 			defer func() {
 				if sem != nil {
 					<-sem
+				}
+			}()
+			// One panicking conn must NOT take down the gateway for every
+			// other multiplexed client. Recover, surface via OnAcceptError
+			// (so the panic counter ticks) and let the deferred conn close
+			// run. The two sockets are closed by *Conn's own defers.
+			defer func() {
+				if r := recover(); r != nil && l.OnAcceptError != nil {
+					l.OnAcceptError(fmt.Errorf("panic in conn goroutine: %v", r))
 				}
 			}()
 			if l.OnConnStart != nil {

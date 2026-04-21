@@ -1,7 +1,7 @@
 // Package proxy is the kproxy hot-path: per-client connection lifecycle, two
 // framed pumps (client→broker and broker→client), correlation tracking, and
 // interceptor dispatch. It deliberately knows nothing about Kafka semantics
-// beyond the request/response header — all rewriting happens through the
+// beyond the request/response header  all rewriting happens through the
 // Interceptor interface.
 package proxy
 
@@ -66,7 +66,7 @@ type Conn struct {
 	brokerR *frame.Reader
 	brokerW *frame.Writer
 
-	// ctx is the per-connection context, cancelled when the conn shuts down.
+	// ctx is the per-connection context, canceled when the conn shuts down.
 	// Stored so the upstream pump can pass it to the Interceptor.
 	ctx context.Context
 
@@ -80,9 +80,9 @@ func New(cfg Config, client, broker net.Conn, ic Interceptor) *Conn {
 	if ic == nil {
 		ic = NoopInterceptor{}
 	}
-	max := cfg.MaxFrameSize
-	if max <= 0 {
-		max = frame.MaxFrameSize
+	maxSize := cfg.MaxFrameSize
+	if maxSize <= 0 {
+		maxSize = frame.MaxFrameSize
 	}
 	if cfg.Frames == nil {
 		cfg.Frames = noopFrameCounter{}
@@ -93,22 +93,22 @@ func New(cfg Config, client, broker net.Conn, ic Interceptor) *Conn {
 		broker:      broker,
 		interceptor: ic,
 		tracker:     NewTracker(cfg.MaxInflight, cfg.PendingMaxAge),
-		clientR:     frame.NewReader(client, max),
+		clientR:     frame.NewReader(client, maxSize),
 		clientW:     frame.NewWriter(client),
-		brokerR:     frame.NewReader(broker, max),
+		brokerR:     frame.NewReader(broker, maxSize),
 		brokerW:     frame.NewWriter(broker),
 	}
 }
 
-// Run drives both pumps until either side closes or ctx is cancelled. It
+// Run drives both pumps until either side closes or ctx is canceled. It
 // returns the first non-EOF error observed, or nil on clean shutdown. Run
 // blocks the calling goroutine; the typical caller is the per-conn goroutine
 // in the listener.
 func (c *Conn) Run(ctx context.Context) error {
 	c.ctx = ctx
-	// Cancellation: when ctx fires, we close both sockets. The pump goroutines
-	// then exit on their next read/write with a "use of closed conn" error,
-	// which we map to nil if it was caused by us.
+	// Cancellation: when ctx fires, both sockets are closed. The pump
+	// goroutines then exit on their next read/write with a "use of closed
+	// conn" error, mapped to nil when caused by the local close.
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 	go func() {
@@ -120,8 +120,12 @@ func (c *Conn) Run(ctx context.Context) error {
 	}()
 
 	errCh := make(chan error, 2)
-	go func() { errCh <- c.upstreamPump() }()
-	go func() { errCh <- c.downstreamPump() }()
+	go func() {
+		errCh <- c.upstreamPump()
+	}()
+	go func() {
+		errCh <- c.downstreamPump()
+	}()
 
 	// Wait for one pump to exit, force the other to wind down, then collect.
 	first := <-errCh
@@ -132,8 +136,8 @@ func (c *Conn) Run(ctx context.Context) error {
 
 // upstreamPump reads frames from the client, decodes the request header,
 // consults the interceptor (which may register a Pending), and forwards the
-// frame to the broker. The frame's bytes are forwarded byte-for-byte — even
-// for intercepted requests we don't rewrite the wire form yet (the rewrites
+// frame to the broker. The frame's bytes are forwarded byte-for-byte - even
+// for intercepted requests the wire form is not rewritten yet (the rewrites
 // happen on responses).
 func (c *Conn) upstreamPump() error {
 	buf := frame.Get()
@@ -154,14 +158,16 @@ func (c *Conn) upstreamPump() error {
 		if err != nil {
 			return err
 		}
-		// Decode header for routing. We only call the interceptor — body bytes
-		// are forwarded as-is so that any version we don't have a codec for
+		// Decode header for routing. Only the interceptor is invoked on body
+		// are forwarded as-is so that any version without a local codec
 		// still flows through.
 		h, err := kwire.DecodeRequestHeader(body)
 		if err != nil {
 			// Malformed header: refuse to forward, kill the conn. The client
-			// is broken or hostile.
-			return fmt.Errorf("decode req header (len=%d, hex=%x): %w", len(body), body, err)
+			// is broken or hostile. The frame body is intentionally NOT logged
+			// (a 16 MiB frame would emit 32 MiB of hex per offending client -
+			// trivial log-fill DoS).
+			return fmt.Errorf("decode req header (len=%d): %w", len(body), err)
 		}
 		out := body
 		if p := c.interceptor.OnRequest(c.ctx, h, body[h.HeaderSize:]); p != nil {
@@ -171,13 +177,22 @@ func (c *Conn) upstreamPump() error {
 			p.Sent = time.Now()
 			if p.RewriteRequest != nil {
 				// Splice header + new payload. Use a dedicated scratch buf so
-				// we don't alias body (which still backs the header bytes).
+				// body which still backs the header bytes is not aliased.
 				reqRewriteBuf = append(reqRewriteBuf[:0], body[:h.HeaderSize]...)
 				reqRewriteBuf = append(reqRewriteBuf, p.RewriteRequest...)
 				out = reqRewriteBuf
 			}
+			// When a Rewrite is registered the response MUST be transformed.
+			// If the tracker is full and Register returns false the response
+			// would pass through raw - that is a topology bypass for
+			// Metadata/FindCoordinator. Refuse to forward and kill the conn
+			// so the client retries via a different proxy instance rather
+			// than learning real broker addresses.
 			if !c.tracker.Register(p) {
 				c.cfg.Frames.IncTrackerDropped()
+				if p.Rewrite != nil {
+					return fmt.Errorf("tracker full, refusing to forward unrewritable request (apiKey=%d)", h.APIKey)
+				}
 			}
 		}
 		if err := c.brokerW.WriteFrame(out); err != nil {
@@ -196,7 +211,7 @@ func (c *Conn) upstreamPump() error {
 //     rewritten payload).
 //
 // They MUST NOT share backing storage, because the rewriter's returned slice
-// is read while we write the response header into outBuf.
+// is read while the response header is written into outBuf.
 func (c *Conn) downstreamPump() error {
 	buf := frame.Get()
 	defer frame.Release(buf)

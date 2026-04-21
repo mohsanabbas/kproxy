@@ -145,7 +145,7 @@ func (c *Cursor) ReadNullableString() (s string, isNull bool, err error) {
 }
 
 // ReadBytes reads a Kafka non-flexible BYTES: int32 length + bytes. The
-// returned slice ALIASES the cursor's buffer; copy if retention is required.
+// returned slice ALIASES the cursor's buffer copy if retention is required.
 // A negative length is malformed for a non-nullable BYTES.
 func (c *Cursor) ReadBytes() ([]byte, error) {
 	n, err := c.ReadInt32()
@@ -278,6 +278,9 @@ func (c *Cursor) ReadCompactNullableBytes() (b []byte, isNull bool, err error) {
 }
 
 // ReadArrayLen reads a non-flexible ARRAY length (int32, -1 means null).
+// The returned length is bounded by Remaining() to prevent a hostile frame
+// declaring a multi-GiB length from triggering an OOM in callers that
+// pre-allocate via make([]T, n).
 func (c *Cursor) ReadArrayLen() (n int, isNull bool, err error) {
 	v, err := c.ReadInt32()
 	if err != nil {
@@ -286,11 +289,16 @@ func (c *Cursor) ReadArrayLen() (n int, isNull bool, err error) {
 	if v < 0 {
 		return 0, true, nil
 	}
+	if int(v) > c.Remaining() {
+		return 0, false, ErrTruncated
+	}
 	return int(v), false, nil
 }
 
 // ReadCompactArrayLen reads a flexible COMPACT_ARRAY length (uvarint(len+1),
-// 0 means null).
+// 0 means null). The returned length is bounded by Remaining() to prevent a
+// hostile frame declaring an enormous length from triggering an OOM in
+// callers that pre-allocate via make([]T, n).
 func (c *Cursor) ReadCompactArrayLen() (n int, isNull bool, err error) {
 	v, err := c.ReadUvarint()
 	if err != nil {
@@ -299,11 +307,15 @@ func (c *Cursor) ReadCompactArrayLen() (n int, isNull bool, err error) {
 	if v == 0 {
 		return 0, true, nil
 	}
-	return int(v) - 1, false, nil
+	n = int(v) - 1
+	if n < 0 || n > c.Remaining() {
+		return 0, false, ErrTruncated
+	}
+	return n, false, nil
 }
 
-// SkipTaggedFields walks past a KIP-482 tagged-fields section. We never
-// produce tagged fields ourselves, so any we read are discarded.
+// SkipTaggedFields walks past a KIP-482 tagged-fields section. kproxy never
+// produces tagged fields itself, so any read are discarded.
 func (c *Cursor) SkipTaggedFields() error {
 	n, err := c.ReadUvarint()
 	if err != nil {
@@ -323,8 +335,6 @@ func (c *Cursor) SkipTaggedFields() error {
 	}
 	return nil
 }
-
-// ---------- Append helpers (encode side) ----------
 
 // AppendInt8 appends a signed 8-bit integer.
 func AppendInt8(dst []byte, v int8) []byte {
@@ -359,9 +369,9 @@ func AppendUvarint(dst []byte, v uint32) []byte {
 //
 // NOTE: Kafka non-flexible STRING uses an int16 length prefix so the maximum
 // addressable string length is 32 KiB - 1. Callers MUST not pass longer
-// strings; the proxy never builds strings near that bound (client-id, topic
+// strings the proxy never builds strings near that bound (client-id, topic
 // names) so the int conversion is safe in practice. The frame layer also
-// rejects any frame larger than MaxFrameSize as a defence in depth.
+// rejects any frame larger than MaxFrameSize as a defense in depth.
 func AppendString(dst []byte, s string) []byte {
 	dst = AppendInt16(dst, int16(len(s))) // #nosec G115 -- bounded by Kafka string max (32KiB) enforced by frame layer
 	return append(dst, s...)

@@ -91,20 +91,31 @@ func TestPrimitivesRoundTrip(t *testing.T) {
 
 	t.Run("array lengths", func(t *testing.T) {
 		t.Parallel()
+		// Each non-null length must be followed by at least n bytes of
+		// payload so that ReadArrayLen / ReadCompactArrayLen (which now
+		// reject lengths exceeding Remaining()) accept the round-trip.
 		buf := AppendArrayLen(nil, 3, false)
+		buf = append(buf, 1, 2, 3)
 		buf = AppendArrayLen(buf, 0, true)
 		buf = AppendCompactArrayLen(buf, 5, false)
+		buf = append(buf, 1, 2, 3, 4, 5)
 		buf = AppendCompactArrayLen(buf, 0, true)
 
 		c := NewCursor(buf)
 		if n, isNull, err := c.ReadArrayLen(); err != nil || isNull || n != 3 {
 			t.Fatalf("array len 3: got %d isNull=%v err=%v", n, isNull, err)
 		}
+		if err := c.Skip(3); err != nil {
+			t.Fatalf("skip 3: %v", err)
+		}
 		if n, isNull, err := c.ReadArrayLen(); err != nil || !isNull || n != 0 {
 			t.Fatalf("array len null: got %d isNull=%v err=%v", n, isNull, err)
 		}
 		if n, isNull, err := c.ReadCompactArrayLen(); err != nil || isNull || n != 5 {
 			t.Fatalf("compact array 5: got %d isNull=%v err=%v", n, isNull, err)
+		}
+		if err := c.Skip(5); err != nil {
+			t.Fatalf("skip 5: %v", err)
 		}
 		if n, isNull, err := c.ReadCompactArrayLen(); err != nil || !isNull || n != 0 {
 			t.Fatalf("compact array null: got %d isNull=%v err=%v", n, isNull, err)
@@ -202,7 +213,7 @@ func isExpected(err error) bool {
 // range without allocating a fresh buffer per iteration.
 func BenchmarkUvarintRoundTrip(b *testing.B) {
 	var buf [8]byte
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		out := AppendUvarint(buf[:0], uint32(i))
 		c := NewCursor(out)
 		v, err := c.ReadUvarint()

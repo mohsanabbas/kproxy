@@ -1,17 +1,18 @@
 package kwire
 
-// ListOffsets v6 codec — kproxy is the client for telemetry collection, so we
-// pin to v6 (first flexible version, schema stable through v9 for our purposes:
-// we only ever ask for the latest offset, never max-timestamp/local-log/tiered).
+// ListOffsets v6 codec - kproxy is the client for telemetry collection and
+// pins to v6 (first flexible version, schema stable through v9 for these
+// purposes: only the latest offset is ever requested, never
+// max-timestamp/local-log/tiered).
 //
-// We only encode the request and only decode the response.
+// Only the request is encoded and only the response is decoded.
 
 const ListOffsetsVersion int16 = 6
 
 // OffsetLatest is the special timestamp value meaning "high water mark".
 const OffsetLatest int64 = -1
 
-// IsolationReadUncommitted is the only isolation level we use for telemetry —
+// IsolationReadUncommitted is the only isolation level used for telemetry -
 // transactional records included.
 const IsolationReadUncommitted int8 = 0
 

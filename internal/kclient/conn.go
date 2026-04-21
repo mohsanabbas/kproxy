@@ -1,11 +1,11 @@
 // Package kclient is a minimal synchronous Kafka client used by kproxy for
 // telemetry collection (Metadata, ListOffsets, OffsetFetch, DescribeGroups).
 //
-// It is intentionally NOT used on the proxy hot path — the proxy forwards
+// It is intentionally NOT used on the proxy hot path - the proxy forwards
 // frames opaquely. kclient exists so the telemetry poller can issue RPCs
 // against the real cluster without taking a third-party dependency.
 //
-// Concurrency model: one outstanding request per *Conn. Callers serialise.
+// Concurrency model: one outstanding request per *Conn. Callers serialize.
 // Callers needing parallelism use multiple *Conn or a Pool.
 package kclient
 
@@ -33,11 +33,11 @@ type Conn struct {
 	clientID string
 
 	// nextCorrelID is allocated atomically so callers don't need to lock to
-	// produce a fresh id; the per-call lock below still serialises the actual
+	// produce a fresh id; the per-call lock below still serializes the actual
 	// write+read.
 	nextCorrelID atomic.Int32
 
-	// mu serialises Do calls — one outstanding request at a time per Conn.
+	// mu serializes Do calls - one outstanding request at a time per Conn.
 	mu sync.Mutex
 
 	// respBuf is a single reusable buffer holding the most recent response.
@@ -81,15 +81,15 @@ func (c *Conn) SetDeadline(t time.Time) error { return c.conn.SetDeadline(t) }
 // Do issues one synchronous request and returns the response body (i.e. the
 // bytes after the response header has been stripped). The returned slice
 // aliases the frame.Buffer that backs it; callers must finish using it before
-// the next Do call (which will reuse the buffer) — or copy out what they need.
+// the next Do call (which will reuse the buffer) - or copy out what they need.
 func (c *Conn) Do(apiKey, apiVersion int16, reqBody []byte) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	correlID := c.nextCorrelID.Add(1)
 
-	// Build request frame: header then body. We allocate one buffer per call
-	// because we don't have a write-side pool yet — telemetry is low-rate, so
+	// Build request frame: header then body. A new buffer is allocated per call
+	// because a write-side pool is not wired yet - telemetry is low-rate, so
 	// the GC pressure is negligible.
 	hdr := kwire.RequestHeader{
 		APIKey:     apiKey,
@@ -104,8 +104,8 @@ func (c *Conn) Do(apiKey, apiVersion int16, reqBody []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	// Read response into a pooled buffer. We don't release it here because we
-	// return a slice into it; the next Do call reuses the same logical buffer
+	// Read response into a pooled buffer. It is not released here because the
+	// return a slice into it the next Do call reuses the same logical buffer
 	// after the caller is done.
 	if c.respBuf == nil {
 		c.respBuf = frame.Get()

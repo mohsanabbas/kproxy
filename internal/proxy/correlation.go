@@ -45,13 +45,11 @@ type RewriteFunc func(dst, body []byte, p *Pending) ([]byte, error)
 // owned by exactly one Conn (one per direction-pair) and accessed by both the
 // upstream and downstream pump goroutines, so accesses are locked.
 //
-// Why a plain map rather than an LRU/linked-list+map: lookup is by random
-// correlation id (the response's id), not by recency, so the list pointers
-// would be pure overhead. Removal is also random (responses arrive out of
-// order). The only operation that benefits from ordering is age-based
-// eviction, which is rare (entries are normally removed by Take when the
-// response arrives) and bounded by maxSize. We keep the map and amortise the
-// O(n) sweep so it doesn't run on every Register.
+// A plain map is used rather than an LRU/list+map: lookup and removal are
+// keyed by random correlation id, so ordering would be pure overhead. The
+// one operation that wants ordering is age-based eviction, and that is rare
+// and bounded by maxSize; the map sweep is amortized so it does not run on
+// every Register.
 type Tracker struct {
 	mu          sync.Mutex
 	entries     map[int32]*Pending
@@ -71,9 +69,9 @@ func NewTracker(maxSize int, maxAge time.Duration) *Tracker {
 	if maxAge <= 0 {
 		maxAge = 5 * time.Minute
 	}
-	// Sweep at least once every maxAge/4, capped at 1s to avoid spinning on
-	// long-lived deployments. With the default 5-min maxAge we sweep every
-	// second; with a 10ms test value we sweep every ~2.5ms.
+	// Sweep at least once every maxAge/4, capped at 1s. With the default
+	// 5-min maxAge that is once per second; with a 10ms test value, every
+	// ~2.5ms.
 	sweep := min(maxAge/4, time.Second)
 	if sweep <= 0 {
 		sweep = time.Microsecond

@@ -20,7 +20,7 @@ var ErrNegativeFrame = errors.New("frame: negative length")
 
 // Reader reads length-prefixed Kafka frames off a stream.
 //
-// It does NOT own the underlying io.Reader and does NOT buffer across frames —
+// It does NOT own the underlying io.Reader and does NOT buffer across frames -
 // each ReadFrame issues exactly one io.ReadFull for the 4-byte length prefix
 // and one for the body. This keeps the per-conn arena small (one Buffer at a
 // time) and lets the upstream/downstream pumps share Reader state with no

@@ -1,10 +1,10 @@
 package kwire
 
 // ConsumerProtocol is the application-level protocol embedded inside Kafka
-// group-coordination frames. The blobs are NOT versioned by Kafka — they are
+// group-coordination frames. The blobs are NOT versioned by Kafka - they are
 // versioned by the consumer client itself and exchanged opaquely as bytes.
 //
-// We only support versions 0..3 of ConsumerProtocolSubscription and 0..3 of
+// Only versions 0..3 of ConsumerProtocolSubscription and 0..3 of
 // ConsumerProtocolAssignment, which together cover every released Apache Kafka
 // client (Java, librdkafka, Sarama, franz-go) since KIP-429 (cooperative
 // sticky).
@@ -38,7 +38,7 @@ type TopicPartitions struct {
 }
 
 // DecodeSubscription decodes a ConsumerProtocolSubscription blob. It does not
-// require the proxy to know which version the consumer client used — the
+// require the proxy to know which version the consumer client used - the
 // version is the first 2 bytes of the blob.
 //
 // All fields that alias the input buffer (UserData) are documented as such.
@@ -103,7 +103,7 @@ func DecodeSubscription(blob []byte) (Subscription, error) {
 	return s, nil
 }
 
-// AppendSubscription serialises a Subscription using its Version field.
+// AppendSubscription serializes a Subscription using its Version field.
 func AppendSubscription(dst []byte, s Subscription) []byte {
 	dst = AppendInt16(dst, s.Version)
 
@@ -175,7 +175,7 @@ func DecodeAssignment(blob []byte) (Assignment, error) {
 	return a, nil
 }
 
-// AppendAssignment serialises an Assignment using its Version field.
+// AppendAssignment serializes an Assignment using its Version field.
 func AppendAssignment(dst []byte, a Assignment) []byte {
 	dst = AppendInt16(dst, a.Version)
 	dst = appendTopicPartitions(dst, a.Partitions)

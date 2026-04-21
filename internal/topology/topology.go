@@ -7,7 +7,7 @@
 // their first Metadata fetch and reconnect directly, bypassing kproxy entirely.
 //
 // The mapping is loaded once at startup from either a `-topology` flag (CSV)
-// or a `-topology-file` (JSON) and is then read-only — there is no dynamic
+// or a `-topology-file` (JSON) and is then read-only - there is no dynamic
 // reload in v1. This keeps the read path lock-free (a plain immutable map).
 package topology
 
@@ -41,7 +41,8 @@ func (e Endpoint) String() string {
 // Mapping holds the broker → advertised mapping.
 //
 // Lookups happen on every Metadata/FindCoordinator response on the downstream
-// path of every conn. To stay lock-free we publish the whole map immutable;
+// path of every conn. To stay lock-free the whole map is published
+// immutable;
 // reloads (not implemented in v1) would build a new Mapping and atomically
 // swap the pointer in the caller.
 type Mapping struct {
@@ -63,9 +64,9 @@ func New() *Mapping {
 //
 // nodeID may be -1 to register a host:port-only mapping (used for FindCoord
 // pre-v4 responses where the node id is per-coordinator, not per-broker).
-func (m *Mapping) Add(nodeID int32, real, advertised Endpoint) error {
-	if real.Host == "" || real.Port <= 0 {
-		return fmt.Errorf("topology: invalid real endpoint %+v", real)
+func (m *Mapping) Add(nodeID int32, realEP, advertised Endpoint) error {
+	if realEP.Host == "" || realEP.Port <= 0 {
+		return fmt.Errorf("topology: invalid real endpoint %+v", realEP)
 	}
 	if advertised.Host == "" || advertised.Port <= 0 {
 		return fmt.Errorf("topology: invalid advertised endpoint %+v", advertised)
@@ -76,7 +77,7 @@ func (m *Mapping) Add(nodeID int32, real, advertised Endpoint) error {
 		}
 		m.byNodeID[nodeID] = advertised
 	}
-	key := real.String()
+	key := realEP.String()
 	if existing, ok := m.byHostPt[key]; ok && existing != advertised {
 		return fmt.Errorf("topology: real endpoint %s already mapped to %s, cannot remap to %s", key, existing, advertised)
 	}
@@ -97,7 +98,12 @@ func (m *Mapping) Lookup(nodeID int32, host string, port int32) (Endpoint, bool)
 			return e, true
 		}
 	}
-	if e, ok := m.byHostPt[host+":"+strconv.Itoa(int(port))]; ok {
+	// Build the host:port key the same way Endpoint.String does so that an
+	// IPv6 host registered via Add (which brackets) matches a downstream
+	// Lookup that receives a bare "::1". Hostnames are normalized to lower
+	// case so case-variant CNAMEs resolve to the same advertised endpoint.
+	key := Endpoint{Host: strings.ToLower(host), Port: port}.String()
+	if e, ok := m.byHostPt[key]; ok {
 		return e, true
 	}
 	return Endpoint{}, false
@@ -135,7 +141,7 @@ func ParseFlag(spec string) (*Mapping, error) {
 		if err != nil {
 			return nil, fmt.Errorf("topology: bad node id in %q: %w", part, err)
 		}
-		real, err := parseEndpoint(strings.TrimSpace(fields[1]))
+		realEP, err := parseEndpoint(strings.TrimSpace(fields[1]))
 		if err != nil {
 			return nil, fmt.Errorf("topology: bad real endpoint in %q: %w", part, err)
 		}
@@ -143,7 +149,7 @@ func ParseFlag(spec string) (*Mapping, error) {
 		if err != nil {
 			return nil, fmt.Errorf("topology: bad advertised endpoint in %q: %w", part, err)
 		}
-		if err := m.Add(int32(nid), real, adv); err != nil {
+		if err := m.Add(int32(nid), realEP, adv); err != nil {
 			return nil, err
 		}
 	}
@@ -165,7 +171,7 @@ type FileEntry struct {
 //
 // The file is opened explicitly (rather than via os.ReadFile) so the close
 // is visible at the call site via defer, and so a Close error can be
-// surfaced. Read size is capped at 1 MiB — a topology file describing
+// surfaced. Read size is capped at 1 MiB - a topology file describing
 // thousands of brokers is well under that.
 func LoadFile(path string) (_ *Mapping, err error) {
 	const maxTopologyBytes = 1 << 20 // 1 MiB
@@ -191,7 +197,7 @@ func LoadFile(path string) (_ *Mapping, err error) {
 	}
 	m := New()
 	for i, e := range entries {
-		real, err := parseEndpoint(e.Real)
+		realEP, err := parseEndpoint(e.Real)
 		if err != nil {
 			return nil, fmt.Errorf("topology: entry %d: %w", i, err)
 		}
@@ -199,7 +205,7 @@ func LoadFile(path string) (_ *Mapping, err error) {
 		if err != nil {
 			return nil, fmt.Errorf("topology: entry %d: %w", i, err)
 		}
-		if err := m.Add(e.NodeID, real, adv); err != nil {
+		if err := m.Add(e.NodeID, realEP, adv); err != nil {
 			return nil, err
 		}
 	}

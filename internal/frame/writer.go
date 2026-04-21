@@ -8,8 +8,8 @@ import (
 )
 
 // Writer writes length-prefixed Kafka frames to a stream. When the underlying
-// writer is a *net.TCPConn we use net.Buffers (writev) to send the 4-byte
-// length and the body in a single syscall — zero allocations per frame.
+// writer is a *net.TCPConn, net.Buffers (writev) sends the 4-byte
+// length and the body in a single syscall - zero allocations per frame.
 type Writer struct {
 	w   io.Writer
 	hdr [4]byte
@@ -21,7 +21,7 @@ func NewWriter(w io.Writer) *Writer { return &Writer{w: w} }
 // WriteFrame emits one frame consisting of a 4-byte big-endian length and the
 // body. The body slice is not retained.
 //
-// Returns ErrFrameTooLarge if len(body) does not fit in uint32 — defensive
+// Returns ErrFrameTooLarge if len(body) does not fit in uint32 - defensive
 // belt-and-braces against a caller that bypasses the configured MaxFrameSize.
 func (wr *Writer) WriteFrame(body []byte) error {
 	n := len(body)

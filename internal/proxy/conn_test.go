@@ -16,8 +16,8 @@ import (
 // pair wires a kproxy Conn between fake-client and fake-broker net.Pipes,
 // returns reader/writer handles for the two ends, plus a shutdown closure.
 type pair struct {
-	clientEnd net.Conn // the test's "client" — writes requests, reads responses
-	brokerEnd net.Conn // the test's "broker" — reads requests, writes responses
+	clientEnd net.Conn // the test's "client" - writes requests, reads responses
+	brokerEnd net.Conn // the test's "broker" - reads requests, writes responses
 	conn      *Conn
 	runErr    chan error
 	cancel    context.CancelFunc

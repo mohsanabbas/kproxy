@@ -4,7 +4,7 @@
 // payloads (which is fragile under cooperative-sticky upgrades).
 //
 // The store is shared across all proxy connections. Concurrency is a single
-// RWMutex — entries are written rarely (once per JoinGroup per member, every
+// RWMutex - entries are written rarely (once per JoinGroup per member, every
 // few seconds at most) and read on every SyncGroup. Lock contention is not
 // expected to be a hotspot; if it ever is, switch to per-group sharding.
 package subscription
